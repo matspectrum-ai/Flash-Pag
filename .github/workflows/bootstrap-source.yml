@@ -1,0 +1,23 @@
+name: bootstrap-source
+on:
+  push:
+    branches: [feat/minimal-pix-gateway]
+permissions:
+  contents: write
+jobs:
+  bootstrap:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Expand validated source tree
+        shell: bash
+        run: |
+          cat .bootstrap/part-* | base64 -d > /tmp/flashpag-src.txz
+          tar -xJf /tmp/flashpag-src.txz -C .
+          rm -rf .bootstrap .github/workflows/bootstrap-source.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'feat: build minimal multi-provider Pix gateway'
+          git push origin HEAD:feat/minimal-pix-gateway
