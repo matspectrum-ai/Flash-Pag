@@ -13,6 +13,12 @@ import { useSession } from '../../app/session'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { formatBRL, formatDateTime } from '../../lib/format'
 
+type PricedTransaction = Transaction & {
+  fee_minor?: number
+  pricing_version?: number
+  pricing_version_id?: string
+}
+
 function isPixReceipt(transaction: Transaction) {
   return transaction.direction === 'in' || transaction.kind === 'pix_in'
 }
@@ -23,18 +29,18 @@ export function TransactionsPage() {
   const previewReadOnly = import.meta.env.VITE_PREVIEW_READ_ONLY === 'true'
   const [status, setStatus] = useState('all')
   const [search, setSearch] = useState('')
-  const [selected, setSelected] = useState<Transaction | null>(null)
+  const [selected, setSelected] = useState<PricedTransaction | null>(null)
 
   const transactionsQuery = useQuery({
     queryKey: ['transactions', organizationId],
-    queryFn: () => api.list<Transaction>('transactions', organizationId!),
+    queryFn: () => api.list<PricedTransaction>('transactions', organizationId!),
     enabled: Boolean(organizationId),
   })
 
   const reconcileMutation = useMutation({
-    mutationFn: (transaction: Transaction) => api.reconcileTransaction(transaction.id, organizationId!),
+    mutationFn: (transaction: PricedTransaction) => api.reconcileTransaction(transaction.id, organizationId!),
     onSuccess: (fresh) => {
-      setSelected(fresh)
+      setSelected((current) => current?.id === fresh.id ? { ...current, ...fresh } : fresh as PricedTransaction)
       void queryClient.invalidateQueries({ queryKey: ['transactions', organizationId] })
       void queryClient.invalidateQueries({ queryKey: ['summary', organizationId] })
     },
@@ -77,6 +83,16 @@ export function TransactionsPage() {
       </div>
     )
   }
+
+  const feeMinor = selected?.fee_minor ?? 0
+  const chargedFeeMinor = selected?.status === 'failed' ? 0 : feeMinor
+  const netMinor = selected ? selected.amount_minor - chargedFeeMinor : 0
+  const feeStateLabel = selected?.status === 'succeeded'
+    ? 'Taxa Flash Pag'
+    : selected?.status === 'failed'
+      ? 'Taxa cobrada'
+      : 'Taxa prevista'
+  const netStateLabel = selected?.status === 'succeeded' ? 'Crédito líquido' : 'Crédito líquido previsto'
 
   return (
     <div className="page-stack">
@@ -157,6 +173,13 @@ export function TransactionsPage() {
               <StatusBadge status={selected.status} />
             </div>
 
+            <dl className="detail-list transaction-pricing-breakdown">
+              <div><dt>Valor bruto</dt><dd className="money">{formatBRL(selected.amount_minor)}</dd></div>
+              <div><dt>{feeStateLabel}</dt><dd className="money">{formatBRL(chargedFeeMinor)}</dd></div>
+              {selected.status !== 'failed' ? <div><dt>{netStateLabel}</dt><dd className="money money-positive">{formatBRL(netMinor)}</dd></div> : null}
+              {selected.status === 'failed' && feeMinor > 0 ? <div><dt>Taxa da política congelada</dt><dd>{formatBRL(feeMinor)} · não reconhecida</dd></div> : null}
+            </dl>
+
             {(selected.status === 'pending' || selected.status === 'ambiguous') ? (
               <div className="drawer-callout warning-callout">
                 <CircleAlert size={17} />
@@ -196,6 +219,8 @@ export function TransactionsPage() {
                 <div><dt>ID externo</dt><dd className="mono">{selected.provider_external_id || '—'}</dd></div>
                 <div><dt>Conexão</dt><dd className="mono">{selected.provider_connection_id || '—'}</dd></div>
                 <div><dt>Conta</dt><dd className="mono">{selected.account_id || '—'}</dd></div>
+                {selected.pricing_version ? <div><dt>Pricing</dt><dd>v{selected.pricing_version}</dd></div> : null}
+                {selected.pricing_version_id ? <div><dt>Pricing ID</dt><dd className="mono">{selected.pricing_version_id}</dd></div> : null}
               </dl>
             </details>
           </aside>
