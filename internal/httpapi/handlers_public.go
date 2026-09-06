@@ -302,7 +302,7 @@ func (s *Server) getTransaction(w http.ResponseWriter, r *http.Request) {
 }
 func (s *Server) listTransactions(w http.ResponseWriter, r *http.Request) {
 	p := apiP(r.Context())
-	q := url.Values{"organization_id": {"eq." + p.OrganizationID}, "select": {"id,organization_id,account_id,customer_id,provider_connection_id,provider_code,provider_external_id,kind,direction,status,amount_minor,currency,description,pix_key,qr_code,failure_code,failure_message,created_at,updated_at"}, "order": {"created_at.desc"}, "limit": {parseLimit(r.URL.Query().Get("limit"))}}
+	q := url.Values{"organization_id": {"eq." + p.OrganizationID}, "select": {"id,organization_id,account_id,customer_id,provider_connection_id,provider_code,provider_external_id,kind,direction,status,amount_minor,fee_minor,pricing_version_id,pricing_version,currency,description,pix_key,qr_code,failure_code,failure_message,created_at,updated_at"}, "order": {"created_at.desc"}, "limit": {parseLimit(r.URL.Query().Get("limit"))}}
 	var rows []transaction
 	if err := s.sb.Do(r.Context(), http.MethodGet, "/rest/v1/transactions", q, nil, "", &rows); err != nil {
 		writeError(w, 500, "database_error", err.Error())
