@@ -201,6 +201,25 @@ func (s *Server) consoleCreateProviderConnection(w http.ResponseWriter, r *http.
 	if in.Label == "" {
 		in.Label = "default"
 	}
+	if in.ProviderCode == "pixhub" {
+		if in.Credentials == nil {
+			in.Credentials = map[string]any{}
+		}
+		clientID, _ := in.Credentials["client_id"].(string)
+		clientSecret, _ := in.Credentials["client_secret"].(string)
+		if strings.TrimSpace(clientID) == "" || strings.TrimSpace(clientSecret) == "" {
+			writeError(w, 422, "pixhub_credentials_required", "Pixhub requires client_id and client_secret")
+			return
+		}
+		if token, _ := in.Credentials["webhook_token"].(string); token == "" {
+			token, err := id.Token(24)
+			if err != nil {
+				writeError(w, 500, "webhook_token_generation_failed", err.Error())
+				return
+			}
+			in.Credentials["webhook_token"] = token
+		}
+	}
 	var cipher any = nil
 	if len(in.Credentials) > 0 {
 		if s.box == nil {

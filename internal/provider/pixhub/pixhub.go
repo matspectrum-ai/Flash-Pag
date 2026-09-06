@@ -183,9 +183,9 @@ func (p *Provider) VerifyWebhook(_ context.Context, conn provider.Connection, he
 	}
 
 	var payload struct {
-		ID    string `json:"id"`
-		Type  string `json:"type"`
-		Event string `json:"event"`
+		ID          string `json:"id"`
+		Type        string `json:"type"`
+		Event       string `json:"event"`
 		Transaction *struct {
 			ID     string `json:"id"`
 			Amount int64  `json:"amount"`

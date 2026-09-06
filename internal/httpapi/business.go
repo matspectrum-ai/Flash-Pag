@@ -44,6 +44,14 @@ type account struct {
 	CreatedAt      string `json:"created_at"`
 }
 
+type customerRow struct {
+	ID       string         `json:"id"`
+	Name     *string        `json:"name"`
+	Email    *string        `json:"email"`
+	Document *string        `json:"document"`
+	Metadata map[string]any `json:"metadata"`
+}
+
 type providerConnectionRow struct {
 	ID                    string          `json:"id"`
 	OrganizationID        string          `json:"organization_id"`
@@ -117,6 +125,39 @@ func (s *Server) providerConnection(ctx context.Context, orgID, code, requested 
 		creds = raw
 	}
 	return provider.Connection{ID: rows[0].ID, ProviderCode: rows[0].ProviderCode, Credentials: creds}, nil
+}
+
+func (s *Server) customerForOrg(ctx context.Context, orgID, customerID string) (customerRow, error) {
+	q := url.Values{"id": {"eq." + customerID}, "organization_id": {"eq." + orgID}, "select": {"id,name,email,document,metadata"}, "limit": {"1"}}
+	var rows []customerRow
+	if err := s.sb.Do(ctx, http.MethodGet, "/rest/v1/customers", q, nil, "", &rows); err != nil {
+		return customerRow{}, err
+	}
+	if len(rows) != 1 {
+		return customerRow{}, errors.New("customer not found")
+	}
+	return rows[0], nil
+}
+
+func stringValue(v *string) string {
+	if v == nil {
+		return ""
+	}
+	return *v
+}
+
+func (s *Server) providerCallbackURL(conn provider.Connection) string {
+	if conn.ID == "" || conn.ProviderCode == "" || s.cfg.PublicURL == "" {
+		return ""
+	}
+	callback := s.cfg.PublicURL + "/providers/" + conn.ProviderCode + "/webhooks/" + conn.ID
+	var secrets struct {
+		WebhookToken string `json:"webhook_token"`
+	}
+	if len(conn.Credentials) > 0 && json.Unmarshal(conn.Credentials, &secrets) == nil && secrets.WebhookToken != "" {
+		callback += "?token=" + url.QueryEscape(secrets.WebhookToken)
+	}
+	return callback
 }
 
 func (s *Server) claimIdempotency(ctx context.Context, orgID, operation, key, fp, resourceID string) (idempotencyClaim, error) {

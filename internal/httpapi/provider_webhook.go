@@ -33,7 +33,11 @@ func (s *Server) providerWebhook(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 400, "invalid_body", err.Error())
 		return
 	}
-	evt, err := impl.VerifyWebhook(r.Context(), conn, map[string][]string(r.Header), body)
+	headers := map[string][]string(r.Header)
+	if token := r.URL.Query().Get("token"); token != "" {
+		headers["X-FlashPag-Webhook-Token"] = []string{token}
+	}
+	evt, err := impl.VerifyWebhook(r.Context(), conn, headers, body)
 	if err != nil {
 		writeError(w, 401, "invalid_webhook", err.Error())
 		return

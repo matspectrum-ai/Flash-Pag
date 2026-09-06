@@ -88,6 +88,24 @@ func (s *Server) createChargeForOrg(r *http.Request, orgID, key string, in charg
 	if err != nil {
 		return transaction{}, false, 422, err
 	}
+	var customer any
+	var providerCustomer *provider.Customer
+	if in.CustomerID != "" {
+		c, err := s.customerForOrg(r.Context(), orgID, in.CustomerID)
+		if err != nil {
+			return transaction{}, false, 422, err
+		}
+		customer = in.CustomerID
+		providerCustomer = &provider.Customer{Name: stringValue(c.Name), Email: stringValue(c.Email), Document: stringValue(c.Document)}
+		if c.Metadata != nil {
+			if phone, ok := c.Metadata["phone"].(string); ok {
+				providerCustomer.Phone = phone
+			}
+		}
+	}
+	if in.ProviderCode == "pixhub" && providerCustomer == nil {
+		return transaction{}, false, 422, errors.New("customer_id is required for Pixhub charges")
+	}
 	resourceID, err := id.UUID()
 	if err != nil {
 		return transaction{}, false, 500, err
@@ -112,10 +130,6 @@ func (s *Server) createChargeForOrg(r *http.Request, orgID, key string, in charg
 	default:
 		return transaction{}, false, 500, errors.New("invalid idempotency state")
 	}
-	var customer any = nil
-	if in.CustomerID != "" {
-		customer = in.CustomerID
-	}
 	var connection any = nil
 	if conn.ID != "" {
 		connection = conn.ID
@@ -128,7 +142,7 @@ func (s *Server) createChargeForOrg(r *http.Request, orgID, key string, in charg
 	if err != nil {
 		return transaction{}, false, 422, err
 	}
-	result, err := impl.CreateCharge(r.Context(), conn, provider.ChargeRequest{OperationID: resourceID, AmountMinor: in.AmountMinor, Currency: in.Currency, Description: in.Description})
+	result, err := impl.CreateCharge(r.Context(), conn, provider.ChargeRequest{OperationID: resourceID, AmountMinor: in.AmountMinor, Currency: in.Currency, Description: in.Description, Customer: providerCustomer, WebhookURL: s.providerCallbackURL(conn)})
 	if err != nil {
 		if provider.IsFinal(err) {
 			_ = s.patchTransaction(r.Context(), resourceID, map[string]any{"status": "failed", "failure_code": "provider_rejected", "failure_message": err.Error()})
@@ -243,7 +257,7 @@ func (s *Server) createOutboundForOrg(r *http.Request, orgID, key, kind string, 
 	if err != nil {
 		return transaction{}, false, 422, err
 	}
-	result, err := impl.CreateTransfer(r.Context(), conn, provider.TransferRequest{OperationID: resourceID, AmountMinor: in.AmountMinor, Currency: in.Currency, PixKey: in.PixKey, Description: in.Description})
+	result, err := impl.CreateTransfer(r.Context(), conn, provider.TransferRequest{OperationID: resourceID, AmountMinor: in.AmountMinor, Currency: in.Currency, PixKey: in.PixKey, Description: in.Description, WebhookURL: s.providerCallbackURL(conn)})
 	if err != nil {
 		if provider.IsFinal(err) {
 			_ = s.sb.Do(r.Context(), http.MethodPost, "/rest/v1/rpc/fail_outbound", nil, map[string]any{"p_transaction_id": resourceID, "p_code": "provider_rejected", "p_message": err.Error()}, "", nil)
