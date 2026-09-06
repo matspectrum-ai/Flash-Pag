@@ -15,6 +15,8 @@ import { OrganizationPage } from '../features/organization/OrganizationPage'
 import { PlatformPage } from '../features/platform/PlatformPage'
 import { PlatformKYCPage } from '../features/platform/PlatformKYCPage'
 import { PlatformPricingPage } from '../features/platform/PlatformPricingPage'
+import { AdminFinancePage } from '../features/platform/AdminFinancePage'
+import { Merchant360Page } from '../features/platform/Merchant360Page'
 import { useSession } from './session'
 
 export function App() {
@@ -45,6 +47,8 @@ export function App() {
         <Route path="connections" element={<ConnectionsPage />} />
         <Route path="organization" element={<OrganizationPage />} />
         <Route path="platform" element={<PlatformPage />} />
+        <Route path="platform/finance" element={<AdminFinancePage />} />
+        <Route path="platform/merchants/:merchantId" element={<Merchant360Page />} />
         <Route path="platform/kyc" element={<PlatformKYCPage />} />
         <Route path="platform/pricing" element={<PlatformPricingPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
