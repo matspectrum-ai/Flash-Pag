@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
+  Activity,
   ArrowLeftRight,
   BadgeCheck,
   BookOpen,
@@ -37,6 +38,7 @@ const pageMeta: Record<string, { title: string; subtitle?: string }> = {
   '/connections': { title: 'Conexões', subtitle: 'Provedores e infraestrutura de pagamento' },
   '/organization': { title: 'Organização', subtitle: 'Contexto, equipe e permissões do merchant' },
   '/platform': { title: 'Plataforma', subtitle: 'Operação administrativa da Flash Pag' },
+  '/platform/finance': { title: 'Financeiro', subtitle: 'TPV, receita, custo de provider e margem da plataforma' },
   '/platform/kyc': { title: 'KYC', subtitle: 'Fila de verificação de Merchants' },
   '/platform/pricing': { title: 'Taxas', subtitle: 'Pricing versionado dos Merchants' },
 }
@@ -46,7 +48,9 @@ const primaryMobilePaths = new Set(['/', '/transactions', '/customers'])
 export function AppShell() {
   const location = useLocation()
   const { me, organizationId, setOrganizationId, logout } = useSession()
-  const meta = pageMeta[location.pathname] ?? pageMeta['/']
+  const meta = location.pathname.startsWith('/platform/merchants/')
+    ? { title: 'Merchant 360°', subtitle: 'Visão financeira e operacional completa do tenant' }
+    : pageMeta[location.pathname] ?? pageMeta['/']
   const previewReadOnly = import.meta.env.VITE_PREVIEW_READ_ONLY === 'true'
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false)
   const selectedOrganization = (me?.organizations ?? []).find((item) => item.id === organizationId)
@@ -140,6 +144,10 @@ export function AppShell() {
               <NavLink to="/platform" end className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
                 <Building2 size={17} strokeWidth={1.8} />
                 <span>Administração</span>
+              </NavLink>
+              <NavLink to="/platform/finance" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
+                <Activity size={17} strokeWidth={1.8} />
+                <span>Financeiro</span>
               </NavLink>
               <NavLink to="/platform/kyc" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
                 <ClipboardCheck size={17} strokeWidth={1.8} />
@@ -297,6 +305,10 @@ export function AppShell() {
                       <NavLink to="/platform" className={({ isActive }) => `mobile-sheet-link${isActive ? ' active' : ''}`}>
                         <span className="mobile-sheet-icon"><Building2 size={18} strokeWidth={1.8} /></span>
                         <strong>Administração</strong>
+                      </NavLink>
+                      <NavLink to="/platform/finance" className={({ isActive }) => `mobile-sheet-link${isActive ? ' active' : ''}`}>
+                        <span className="mobile-sheet-icon"><Activity size={18} strokeWidth={1.8} /></span>
+                        <strong>Financeiro</strong>
                       </NavLink>
                       <NavLink to="/platform/kyc" className={({ isActive }) => `mobile-sheet-link${isActive ? ' active' : ''}`}>
                         <span className="mobile-sheet-icon"><ClipboardCheck size={18} strokeWidth={1.8} /></span>
