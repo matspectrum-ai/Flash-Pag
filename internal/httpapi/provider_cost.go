@@ -28,22 +28,10 @@ func providerCostMinor(providerCode string, payload json.RawMessage) (int64, boo
 }
 
 func findProviderCostMinor(value any) (int64, bool) {
-	keys := map[string]struct{}{
-		"provider_fee_minor":        {},
-		"providerFeeMinor":          {},
-		"providerFeeInCents":        {},
-		"fee_in_cents":              {},
-		"feeInCents":                {},
-		"transaction_fee_in_cents":  {},
-		"transactionFeeInCents":     {},
-		"cost_minor":                {},
-		"costInCents":               {},
-	}
-
 	switch typed := value.(type) {
 	case map[string]any:
 		for key, item := range typed {
-			if _, ok := keys[key]; !ok {
+			if !providerCostKey(key) {
 				continue
 			}
 			if cost, ok := exactMinorInteger(item); ok && cost >= 0 {
@@ -64,6 +52,15 @@ func findProviderCostMinor(value any) (int64, bool) {
 	}
 
 	return 0, false
+}
+
+func providerCostKey(key string) bool {
+	switch key {
+	case "provider_fee_minor", "providerFeeMinor", "providerFeeInCents", "fee_in_cents", "feeInCents", "transaction_fee_in_cents", "transactionFeeInCents", "cost_minor", "costInCents":
+		return true
+	default:
+		return false
+	}
 }
 
 func exactMinorInteger(value any) (int64, bool) {
