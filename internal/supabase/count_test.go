@@ -11,16 +11,16 @@ import (
 func TestCountReadsExactContentRange(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if got := r.Header.Get("Prefer"); got != "count=exact" {
-			t.Fatalf("Prefer = %q, want count=exact", got)
+			t.Errorf("Prefer = %q, want count=exact", got)
 		}
 		if got := r.Header.Get("Range"); got != "0-0" {
-			t.Fatalf("Range = %q, want 0-0", got)
+			t.Errorf("Range = %q, want 0-0", got)
 		}
 		if got := r.Header.Get("apikey"); got != "secret" {
-			t.Fatalf("apikey = %q, want secret", got)
+			t.Errorf("apikey = %q, want secret", got)
 		}
 		if got := r.URL.Query().Get("organization_id"); got != "eq.org-1" {
-			t.Fatalf("organization_id = %q, want eq.org-1", got)
+			t.Errorf("organization_id = %q, want eq.org-1", got)
 		}
 		w.Header().Set("Content-Range", "0-0/123")
 		w.WriteHeader(http.StatusPartialContent)
