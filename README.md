@@ -53,19 +53,56 @@ go run ./cmd/flashpag
 
 Open `http://localhost:8080/docs` for the public API docs and `http://localhost:8080/console/` for the dashboard/admin.
 
-## First provider
+## Providers
 
-The repository ships with `mock`, a deterministic development adapter. It does not emit a real Pix EMV QR code. A live PSP adapter implements only:
+The repository includes two adapters:
 
-- `CreateCharge`
-- `CreateTransfer`
-- `VerifyWebhook`
+- `mock`: deterministic development adapter; never moves real money.
+- `pixhub`: live Pixhub API v1 adapter for PIX IN, PIX OUT and authenticated provider callbacks.
 
-Credentials are stored per organization encrypted with AES-256-GCM under `APP_MASTER_KEY_B64`; plaintext secrets are never returned by list endpoints.
+Provider credentials are stored per organization encrypted with AES-256-GCM under `APP_MASTER_KEY_B64`; plaintext secrets are never returned by list endpoints and must never be committed to Git.
+
+### Pixhub
+
+Create a provider connection from the console under **Integrações** using credentials in this shape:
+
+```json
+{
+  "client_id": "YOUR_PIXHUB_CLIENT_ID",
+  "client_secret": "YOUR_PIXHUB_CLIENT_SECRET"
+}
+```
+
+Flash Pag automatically adds a random encrypted `webhook_token` to the connection. It is appended to the Pixhub `postbackUrl` and validated on callback as a fallback authentication mechanism. If a registered Pixhub webhook provides `PixHub-Signature`, the adapter validates the documented HMAC-SHA256 signature using an optional `webhook_secret` stored in the same encrypted credentials object.
+
+Pixhub PIX IN requires payer CPF/CNPJ, so create the customer first and pass its `customer_id` when creating a charge. The adapter infers `cpf` or `cnpj` from the normalized document length.
+
+Pixhub PIX OUT receives the Flash Pag transaction UUID as `x-idempotency-key`, preventing the PSP operation from being duplicated on safe retries.
+
+Example customer:
+
+```bash
+curl -X POST http://localhost:8080/v1/customers \
+  -H 'Content-Type: application/json' \
+  -H 'X-API-Key: fp_live_...' \
+  -d '{"name":"Cliente Teste","document":"12345678901","email":"cliente@example.com"}'
+```
+
+Example real Pixhub charge:
+
+```bash
+curl -X POST http://localhost:8080/v1/pix/charges \
+  -H 'Content-Type: application/json' \
+  -H 'X-API-Key: fp_live_...' \
+  -H 'Idempotency-Key: order-123' \
+  -d '{"amount_minor":1050,"provider":"pixhub","customer_id":"CUSTOMER_UUID","description":"Pagamento"}'
+```
+
+The returned `qr_code` is the real EMV Pix copy-and-paste string received from Pixhub. The full provider response is retained internally in `provider_payload` for operational evidence.
 
 ## Webhook signature
 
-Outbound webhooks include:
+Outbound merchant webhooks include:
 
 - `X-FlashPag-Event-Id`
 - `X-FlashPag-Timestamp`
@@ -73,20 +110,26 @@ Outbound webhooks include:
 
 The signed message is `<timestamp>.<raw_body>`.
 
+Provider callbacks are separate from merchant callbacks. For Pixhub, Flash Pag accepts either the documented `PixHub-Signature` HMAC when `webhook_secret` is configured, or the encrypted per-connection callback token used in the `postbackUrl`.
+
 ## REST examples
 
 ```bash
 curl -H 'X-API-Key: fp_live_...' http://localhost:8080/v1/balance
 ```
 
+Development-only mock charge:
+
 ```bash
 curl -X POST http://localhost:8080/v1/pix/charges \
   -H 'Content-Type: application/json' \
   -H 'X-API-Key: fp_live_...' \
-  -H 'Idempotency-Key: order-123' \
+  -H 'Idempotency-Key: order-dev-123' \
   -d '{"amount_minor":1050,"provider":"mock","description":"Teste"}'
 ```
 
 ## Current MVP boundary
 
-This is deliberately not a banking core. There is no checkout, product catalog, fee engine, card acquiring, KYC workflow, settlement file parser, reconciliation UI, automatic provider routing, or multi-currency accounting. Provider-specific production semantics must be encoded and tested per adapter before live money is enabled.
+This is deliberately not a banking core. There is no checkout, product catalog, fee engine, card acquiring, KYC workflow, settlement file parser, reconciliation UI, automatic provider routing, or multi-currency accounting.
+
+Pixhub `transaction_refunded` events are persisted as provider evidence but do not yet post a compensating reversal journal. Refund/reversal ledgering and ambiguous-outcome reconciliation are the next financial-core items before treating the gateway as complete for unrestricted production money movement.
