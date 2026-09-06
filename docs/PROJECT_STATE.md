@@ -1,16 +1,18 @@
 # Flash Pag — Project State
 
-Last reconciled from the repository and deployment configuration: 2026-09-06.
+Last reconciled from the repository, GitHub CI and Railway preview: 2026-09-06.
 
 ## Current development state
 
 - Active development branch: `feat/admin-finance-merchant-360`.
 - Phase 1 — KYC/KYB: COMPLETE.
 - Phase 2 — Pricing/Taxas: COMPLETE.
-- Phase 3 — Admin Financeiro + Merchant 360°: IN PROGRESS until exact-head CI and Railway preview validation are complete.
+- Phase 3 — Admin Financeiro + Merchant 360°: IN PROGRESS.
 - Refund/reversal ledgering remains financial-core hardening; it is not the primary Phase 3 scope.
 
-The Phase 3 branch was explicitly reconstructed after an earlier execution timeout. The initial recovered implementation head was `9f0cac522be4735f0a5028b8d49dba1a1f65ddef`. A concurrent follow-up commit `7a8d249c665894e8990163466061e40cb5a254b7` added the Financeiro navigation and Merchant 360° page context before this permanent documentation chain was created. Type-contract hardening reached `79f9c5073e03b600518021ceda380d53edfd3c5d`, which passed the full repository CI pipeline. Provider-cost handling was subsequently hardened so live-provider costs remain unknown until a verified provider-specific cost contract exists.
+The Phase 3 branch was explicitly reconstructed after an earlier execution timeout instead of assuming the interrupted work state. The initial recovered implementation head was `9f0cac522be4735f0a5028b8d49dba1a1f65ddef`. A concurrent follow-up commit `7a8d249c665894e8990163466061e40cb5a254b7` added the Financeiro navigation and Merchant 360° page context. Subsequent type and provider-cost hardening produced the validated implementation checkpoint `d2578b2f26b9109696be66b6a56154666d2674a3`.
+
+Phase 3 remains IN PROGRESS even though that implementation checkpoint has passed CI and read-only preview validation. The phase status should only move to COMPLETE after explicit product acceptance and any remaining agreed Phase 3 adjustments are closed.
 
 ## Deployment separation
 
@@ -21,14 +23,21 @@ Production service:
 - Source repo: `matspectrum-ai/Flash-Pag`.
 - Source branch: `feat/minimal-pix-gateway`.
 - Healthcheck: `/healthz`.
-- Production must remain untouched while Phase 3 is implemented and validated.
+- Production remained unchanged throughout Phase 3 implementation and preview validation.
 
 Development preview:
 - Service: `flash-pag-react-preview`.
 - Source repo: `matspectrum-ai/Flash-Pag`.
-- Current source branch at this reconciliation point: `feat/react-console`.
+- Source branch: `feat/admin-finance-merchant-360`.
 - Preview is protected by `APP_PREVIEW_READ_ONLY` and `VITE_PREVIEW_READ_ONLY`.
-- Phase 3 Definition of Done requires moving only this preview service to `feat/admin-finance-merchant-360` after CI is green on the exact intended head, then validating build, `/healthz`, SPA routes and read-only enforcement.
+- Validated implementation deployment: `b96fc6dc-be7b-4660-ba4e-166e858593a6`.
+- Validated implementation commit: `d2578b2f26b9109696be66b6a56154666d2674a3`.
+- Railway build completed successfully, application started on `:8080`, and `/healthz` passed.
+- Runtime `/healthz` returned HTTP 200 with `{"ok":true,"preview_read_only":true}`.
+- Safe mutation probe `POST /console/register` with `{}` returned HTTP 423 and error code `preview_read_only`, confirming backend mutation blocking before registration logic.
+- `/app/`, `/app/platform/finance`, and `/app/platform/merchants/00000000-0000-0000-0000-000000000000` each returned HTTP 200 with the React SPA root and the same bundled asset references, confirming SPA fallback for Phase 3 routes.
+
+The linked preview follows the Phase 3 branch. Documentation-only commits after the validated implementation checkpoint must still pass branch CI and be served by the preview before a final status report is made.
 
 ## Implemented architecture
 
@@ -95,7 +104,7 @@ Frontend/API work:
 
 ## Verification state
 
-Confirmed green CI for implementation head `79f9c5073e03b600518021ceda380d53edfd3c5d`:
+Validated implementation checkpoint `d2578b2f26b9109696be66b6a56154666d2674a3` passed the full GitHub CI workflow:
 - `gofmt -w ./cmd ./internal && git diff --exit-code`
 - web dependency install
 - TypeScript typecheck
@@ -103,12 +112,11 @@ Confirmed green CI for implementation head `79f9c5073e03b600518021ceda380d53edfd
 - `go test ./...`
 - `go vet ./...`
 
-Provider-cost hardening and subsequent documentation create newer commits, so the final exact head requires its own green CI before preview promotion.
+The same implementation checkpoint was built and served successfully by Railway preview deployment `b96fc6dc-be7b-4660-ba4e-166e858593a6`, with health, SPA fallback and backend read-only enforcement validated as described above.
 
-## Current risks / open validation
+## Current risks / next Phase 3 work
 
-- `flash-pag-react-preview` has not yet been switched from `feat/react-console` to `feat/admin-finance-merchant-360`.
-- The final documentation-corrected head must pass CI before that switch.
 - Pixhub has no verified provider-cost contract in the repository; its cost and any dependent margin intentionally remain unavailable rather than estimated.
 - The current admin dashboard fans out bounded reads per Organization; each Organization is capped at 1,000 loaded transactions and the UI flags truncation. A purpose-built server-side read model should only be introduced later if measured scale/latency justifies it.
-- Refund/reversal compensating ledger journals remain pending hardening.
+- The preview validates route delivery and read-only enforcement, but authenticated visual/product review of Financeiro and Merchant 360° remains a useful acceptance step before declaring the phase COMPLETE.
+- Refund/reversal compensating ledger journals remain pending hardening outside the primary Phase 3 scope.
