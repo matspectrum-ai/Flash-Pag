@@ -96,6 +96,8 @@ export const api = {
     request<SummaryResponse>(withOrganization('/console/api/summary', organizationId)),
   list: <T>(resource: string, organizationId: string) =>
     request<ListResponse<T>>(withOrganization(`/console/api/${resource}`, organizationId)),
+  transactions: (organizationId: string, limit = 1000) =>
+    request<ListResponse<Transaction>>(withOrganization(`/console/api/transactions?limit=${Math.max(1, Math.min(1000, limit))}`, organizationId)),
   members: (organizationId: string) =>
     request<ListResponse<MerchantMember>>(withOrganization('/console/api/members', organizationId)),
   createMember: (organizationId: string, input: MemberInput) =>
