@@ -1,4 +1,11 @@
-import type { ApiErrorShape, ListResponse, MeResponse, SummaryResponse } from './types'
+import type {
+  ApiErrorShape,
+  ListResponse,
+  MeResponse,
+  SummaryResponse,
+  Transaction,
+  TransferInput,
+} from './types'
 
 export class ApiError extends Error {
   status: number
@@ -62,4 +69,14 @@ export const api = {
       withOrganization(`/console/api/provider-connections/${connectionId}/test`, organizationId),
       { method: 'POST', body: '{}' },
     ),
+  reconcileTransaction: (transactionId: string, organizationId: string) =>
+    request<Transaction>(
+      withOrganization(`/console/api/transactions/${transactionId}/reconcile`, organizationId),
+      { method: 'POST', body: '{}' },
+    ),
+  createTransfer: (organizationId: string, input: TransferInput) =>
+    request<Transaction>(withOrganization('/console/api/transfers', organizationId), {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
 }
