@@ -4,7 +4,6 @@ import {
   BookOpen,
   Building2,
   CircleAlert,
-  CircleDollarSign,
   Home,
   KeyRound,
   Landmark,
@@ -26,7 +25,6 @@ const navGroups = [
     label: 'Dinheiro',
     items: [
       { to: '/transactions', label: 'Transações', icon: ArrowLeftRight },
-      { to: '/transfers', label: 'Transferências', icon: CircleDollarSign },
       { to: '/accounts', label: 'Contas', icon: Landmark },
     ],
   },
@@ -53,8 +51,7 @@ const navGroups = [
 
 const pageMeta: Record<string, { title: string; subtitle?: string }> = {
   '/': { title: 'Início', subtitle: 'Visão financeira e operacional' },
-  '/transactions': { title: 'Transações', subtitle: 'Acompanhe entradas, saídas e estados do Pix' },
-  '/transfers': { title: 'Transferências', subtitle: 'Envie Pix com revisão e controle de saldo' },
+  '/transactions': { title: 'Transações', subtitle: 'Pagamentos Pix recebidos dos clientes desta organização' },
   '/accounts': { title: 'Contas', subtitle: 'Saldo e estrutura financeira da organização' },
   '/customers': { title: 'Clientes', subtitle: 'Pagadores e histórico financeiro' },
   '/api-keys': { title: 'API Keys', subtitle: 'Credenciais para integração programática' },
