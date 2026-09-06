@@ -46,13 +46,16 @@ Required outcome:
 - Global metrics with strict semantics:
   - TPV = successful processed `pix_in` volume for the selected period.
   - Flash Pag revenue = fees charged.
-  - Provider cost = real provider cost supported by explicit evidence.
-  - Margin = revenue − provider cost only when provider cost coverage is complete.
+  - Provider cost = real provider cost supported by verified provider-specific evidence.
+  - Margin = revenue − provider cost only when provider-cost coverage is complete.
   - No net-profit metric until all remaining cost categories are modeled.
 - Time-series / charts for platform financial activity.
-- Global Pix transaction view across organizations.
+- Global Pix transaction view across Organizations.
 - Merchant ranking / drill-down.
-- Merchant 360° containing complete operational context for the merchant and all organizations, including KYC/KYB, current pricing, members, accounts/balances, customers, provider connections and recent Pix activity.
+- Global Merchant/Organization inventory that does not silently inherit bounded session/bootstrap limits.
+- Merchant 360° containing complete operational context for the merchant and all Organizations, including KYC/KYB, current pricing, members, accounts/balance context, exact customer/account/provider-connection counts, connection details and recent Pix activity.
+- Merchants with zero Organizations remain valid Merchant 360° subjects and can still expose merchant-level membership/KYC/pricing.
+- Explicit incompleteness indicators whenever safety/read limits are reached.
 - Platform-admin-only access to global/merchant-wide information.
 - No raw provider payload exposure to the browser.
 
@@ -63,11 +66,13 @@ Explicit exclusions:
 
 Release gate:
 1. Implementation complete on `feat/admin-finance-merchant-360`.
-2. CI green on the exact branch head.
-3. Only `flash-pag-react-preview` is switched to the Phase 3 development branch.
-4. Preview deployment succeeds.
-5. `/healthz`, application routes and preview read-only behavior are validated.
-6. Production `flash-pag` remains on its stable branch and is not changed.
+2. Permanent documentation matches the intended head.
+3. CI green on that exact branch head.
+4. Only `flash-pag-react-preview` tracks the Phase 3 development branch.
+5. Preview deployment succeeds from the exact expected SHA.
+6. `/healthz`, application routes and preview read-only behavior are validated.
+7. Production `flash-pag` remains on `feat/minimal-pix-gateway` and is not changed.
+8. Phase status changes to COMPLETE only after the agreed authenticated product/visual acceptance is complete.
 
 Detailed working plan: `docs/phases/PHASE_3_ADMIN_FINANCE_MERCHANT_360.md`.
 
