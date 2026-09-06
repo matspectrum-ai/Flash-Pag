@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ArrowDownLeft, ArrowUpRight, ChevronRight, CircleAlert, Network } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -52,18 +52,14 @@ export function HomePage() {
   const transactions = transactionsQuery.data?.data ?? []
   const connections = connectionsQuery.data?.data ?? []
   const activeConnections = connections.filter((item) => item.status === 'active')
-
-  const metrics = useMemo(() => {
-    const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
-    const recent = transactions.filter((item) => new Date(item.created_at).getTime() >= cutoff)
-    const succeeded = recent.filter((item) => item.status === 'succeeded')
-    const received = succeeded.filter((item) => item.direction === 'in' || item.kind === 'pix_in').reduce((sum, item) => sum + item.amount_minor, 0)
-    const sent = succeeded.filter((item) => item.direction === 'out' || item.kind === 'pix_out' || item.kind === 'transfer' || item.kind === 'withdrawal').reduce((sum, item) => sum + item.amount_minor, 0)
-    const attention = recent.filter((item) => item.status === 'pending' || item.status === 'ambiguous')
-    const decided = recent.filter((item) => item.status === 'succeeded' || item.status === 'failed')
-    const successRate = decided.length ? Math.round((decided.filter((item) => item.status === 'succeeded').length / decided.length) * 100) : 0
-    return { received, sent, attention, successRate }
-  }, [transactions])
+  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
+  const recent = transactions.filter((item) => new Date(item.created_at).getTime() >= cutoff)
+  const succeeded = recent.filter((item) => item.status === 'succeeded')
+  const received = succeeded.filter((item) => item.direction === 'in' || item.kind === 'pix_in').reduce((sum, item) => sum + item.amount_minor, 0)
+  const sent = succeeded.filter((item) => item.direction === 'out' || item.kind === 'pix_out' || item.kind === 'transfer' || item.kind === 'withdrawal').reduce((sum, item) => sum + item.amount_minor, 0)
+  const attention = recent.filter((item) => item.status === 'pending' || item.status === 'ambiguous')
+  const decided = recent.filter((item) => item.status === 'succeeded' || item.status === 'failed')
+  const successRate = decided.length ? Math.round((decided.filter((item) => item.status === 'succeeded').length / decided.length) * 100) : 0
 
   const balance = summary?.balance as unknown as Record<string, unknown> | undefined
   const available = balanceMinor(balance, 'available')
@@ -87,16 +83,16 @@ export function HomePage() {
           </div>
         </div>
 
-        <Metric label="Recebido · 7 dias" value={formatBRL(metrics.received)} detail="Operações concluídas" icon={<ArrowDownLeft size={16} />} />
-        <Metric label="Enviado · 7 dias" value={formatBRL(metrics.sent)} detail="Operações concluídas" icon={<ArrowUpRight size={16} />} />
-        <Metric label="Taxa de sucesso" value={`${metrics.successRate}%`} detail={`${metrics.attention.length} em acompanhamento`} />
+        <Metric label="Recebido · 7 dias" value={formatBRL(received)} detail="Operações concluídas" icon={<ArrowDownLeft size={16} />} />
+        <Metric label="Enviado · 7 dias" value={formatBRL(sent)} detail="Operações concluídas" icon={<ArrowUpRight size={16} />} />
+        <Metric label="Taxa de sucesso" value={`${successRate}%`} detail={`${attention.length} em acompanhamento`} />
       </section>
 
-      {metrics.attention.length ? (
+      {attention.length ? (
         <section className="attention-banner">
           <div className="attention-icon"><CircleAlert size={18} /></div>
           <div>
-            <strong>{metrics.attention.length} operação(ões) precisam de acompanhamento</strong>
+            <strong>{attention.length} operação(ões) precisam de acompanhamento</strong>
             <span>Pendências e estados ambíguos devem ser investigados antes de qualquer nova tentativa.</span>
           </div>
           <Link to="/transactions" className="button button-secondary">Revisar transações</Link>
@@ -149,7 +145,7 @@ export function HomePage() {
   )
 }
 
-function Metric({ label, value, detail, icon }: { label: string; value: string; detail: string; icon?: React.ReactNode }) {
+function Metric({ label, value, detail, icon }: { label: string; value: string; detail: string; icon?: ReactNode }) {
   return <article className="metric-card"><div className="metric-label">{icon}<span>{label}</span></div><strong>{value}</strong><span className="metric-detail">{detail}</span></article>
 }
 
