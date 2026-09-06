@@ -8,6 +8,7 @@ import {
   Building2,
   CircleAlert,
   ClipboardCheck,
+  DollarSign,
   Home,
   KeyRound,
   Landmark,
@@ -37,6 +38,7 @@ const pageMeta: Record<string, { title: string; subtitle?: string }> = {
   '/organization': { title: 'Organização', subtitle: 'Contexto, equipe e permissões do merchant' },
   '/platform': { title: 'Plataforma', subtitle: 'Operação administrativa da Flash Pag' },
   '/platform/kyc': { title: 'KYC', subtitle: 'Fila de verificação de Merchants' },
+  '/platform/pricing': { title: 'Taxas', subtitle: 'Pricing versionado dos Merchants' },
 }
 
 const primaryMobilePaths = new Set(['/', '/transactions', '/customers'])
@@ -142,6 +144,10 @@ export function AppShell() {
               <NavLink to="/platform/kyc" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
                 <ClipboardCheck size={17} strokeWidth={1.8} />
                 <span>KYC</span>
+              </NavLink>
+              <NavLink to="/platform/pricing" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
+                <DollarSign size={17} strokeWidth={1.8} />
+                <span>Taxas</span>
               </NavLink>
             </div>
           ) : null}
@@ -295,6 +301,10 @@ export function AppShell() {
                       <NavLink to="/platform/kyc" className={({ isActive }) => `mobile-sheet-link${isActive ? ' active' : ''}`}>
                         <span className="mobile-sheet-icon"><ClipboardCheck size={18} strokeWidth={1.8} /></span>
                         <strong>KYC</strong>
+                      </NavLink>
+                      <NavLink to="/platform/pricing" className={({ isActive }) => `mobile-sheet-link${isActive ? ' active' : ''}`}>
+                        <span className="mobile-sheet-icon"><DollarSign size={18} strokeWidth={1.8} /></span>
+                        <strong>Taxas</strong>
                       </NavLink>
                     </div>
                   </div>
