@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   ArrowLeftRight,
@@ -16,63 +17,10 @@ import {
   Webhook,
   X,
 } from 'lucide-react'
+import { api } from '../../api/client'
 import { useSession } from '../../app/session'
+import { roleLabel } from '../../lib/format'
 import { BrandMark } from '../brand/BrandMark'
-
-const navGroups = [
-  {
-    label: '',
-    items: [{ to: '/', label: 'Início', icon: Home }],
-  },
-  {
-    label: 'Dinheiro',
-    items: [
-      { to: '/transactions', label: 'Transações', icon: ArrowLeftRight },
-      { to: '/accounts', label: 'Contas', icon: Landmark },
-    ],
-  },
-  {
-    label: '',
-    items: [{ to: '/customers', label: 'Clientes', icon: Users }],
-  },
-  {
-    label: 'Desenvolvedores',
-    items: [
-      { to: '/api-keys', label: 'API Keys', icon: KeyRound },
-      { to: '/webhooks', label: 'Webhooks', icon: Webhook },
-      { to: '/docs', label: 'Documentação', icon: BookOpen },
-    ],
-  },
-  {
-    label: 'Configurações',
-    items: [
-      { to: '/connections', label: 'Conexões', icon: Network },
-      { to: '/organization', label: 'Organização', icon: Settings2 },
-    ],
-  },
-]
-
-const mobileMoreGroups = [
-  {
-    label: 'Financeiro',
-    items: [{ to: '/accounts', label: 'Contas', icon: Landmark }],
-  },
-  {
-    label: 'Desenvolvedores',
-    items: [
-      { to: '/api-keys', label: 'API Keys', icon: KeyRound },
-      { to: '/webhooks', label: 'Webhooks', icon: Webhook },
-      { to: '/docs', label: 'Documentação', icon: BookOpen },
-    ],
-  },
-  {
-    label: 'Configurações',
-    items: [
-      { to: '/connections', label: 'Conexões', icon: Network },
-      { to: '/organization', label: 'Organização', icon: Settings2 },
-    ],
-  },
-]
 
 const pageMeta: Record<string, { title: string; subtitle?: string }> = {
   '/': { title: 'Início', subtitle: 'Visão financeira e operacional' },
@@ -83,7 +31,7 @@ const pageMeta: Record<string, { title: string; subtitle?: string }> = {
   '/webhooks': { title: 'Webhooks', subtitle: 'Eventos e saúde das entregas' },
   '/docs': { title: 'Documentação', subtitle: 'Referência para integrar com a Flash Pag' },
   '/connections': { title: 'Conexões', subtitle: 'Provedores e infraestrutura de pagamento' },
-  '/organization': { title: 'Organização', subtitle: 'Contexto, identidade e acesso' },
+  '/organization': { title: 'Organização', subtitle: 'Contexto, equipe e permissões do merchant' },
   '/platform': { title: 'Plataforma', subtitle: 'Operação administrativa da Flash Pag' },
 }
 
@@ -97,6 +45,41 @@ export function AppShell() {
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false)
   const selectedOrganization = (me?.organizations ?? []).find((item) => item.id === organizationId)
   const moreActive = !primaryMobilePaths.has(location.pathname)
+
+  const accessQuery = useQuery({
+    queryKey: ['access', organizationId],
+    queryFn: () => api.access(organizationId!),
+    enabled: Boolean(organizationId),
+  })
+  const canManageIntegrations = Boolean(accessQuery.data?.can_manage_integrations || me?.user.platform_admin)
+  const currentRole = accessQuery.data?.role
+
+  const developerItems = [
+    ...(canManageIntegrations ? [
+      { to: '/api-keys', label: 'API Keys', icon: KeyRound },
+      { to: '/webhooks', label: 'Webhooks', icon: Webhook },
+    ] : []),
+    { to: '/docs', label: 'Documentação', icon: BookOpen },
+  ]
+  const settingsItems = [
+    ...(canManageIntegrations ? [{ to: '/connections', label: 'Conexões', icon: Network }] : []),
+    { to: '/organization', label: 'Organização', icon: Settings2 },
+  ]
+  const navGroups = [
+    { label: '', items: [{ to: '/', label: 'Início', icon: Home }] },
+    { label: 'Dinheiro', items: [
+      { to: '/transactions', label: 'Transações', icon: ArrowLeftRight },
+      { to: '/accounts', label: 'Contas', icon: Landmark },
+    ] },
+    { label: '', items: [{ to: '/customers', label: 'Clientes', icon: Users }] },
+    { label: 'Desenvolvedores', items: developerItems },
+    { label: 'Configurações', items: settingsItems },
+  ]
+  const mobileMoreGroups = [
+    { label: 'Financeiro', items: [{ to: '/accounts', label: 'Contas', icon: Landmark }] },
+    { label: 'Desenvolvedores', items: developerItems },
+    { label: 'Configurações', items: settingsItems },
+  ]
 
   useEffect(() => {
     setMobileMoreOpen(false)
@@ -151,7 +134,7 @@ export function AppShell() {
             <div className="avatar">{me?.user.email?.charAt(0).toUpperCase() || 'U'}</div>
             <div className="session-copy">
               <strong>{me?.user.email}</strong>
-              <span>{me?.user.platform_admin ? 'Administrador da plataforma' : 'Membro'}</span>
+              <span>{me?.user.platform_admin ? 'Administrador da plataforma' : roleLabel(currentRole)}</span>
             </div>
           </div>
           <button className="button button-quiet button-full" type="button" onClick={() => void logout()}>
@@ -291,7 +274,7 @@ export function AppShell() {
                   <div className="avatar">{me?.user.email?.charAt(0).toUpperCase() || 'U'}</div>
                   <div className="session-copy">
                     <strong>{me?.user.email}</strong>
-                    <span>{me?.user.platform_admin ? 'Administrador da plataforma' : 'Membro'}</span>
+                    <span>{me?.user.platform_admin ? 'Administrador da plataforma' : roleLabel(currentRole)}</span>
                   </div>
                 </div>
                 <button className="button button-quiet" type="button" onClick={() => void logout()}>

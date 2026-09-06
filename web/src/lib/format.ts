@@ -31,6 +31,7 @@ export function roleLabel(role?: string) {
     owner: 'Proprietário',
     admin: 'Administrador',
     member: 'Membro',
+    viewer: 'Visualizador',
     platform_admin: 'Administrador da plataforma',
   }
   return labels[role || ''] || role || '—'

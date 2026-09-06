@@ -8,6 +8,7 @@ import './styles/index.css'
 import './styles/responsive.css'
 import './styles/mobile.css'
 import './styles/saas.css'
+import './styles/members.css'
 
 const queryClient = new QueryClient({
   defaultOptions: {

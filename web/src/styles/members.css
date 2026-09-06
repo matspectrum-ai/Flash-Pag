@@ -1,0 +1,176 @@
+.merchant-team-panel {
+  overflow: hidden;
+}
+
+.panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.member-list {
+  display: grid;
+}
+
+.member-row {
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(132px, auto) minmax(120px, auto) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+  border-top: 1px solid #202026;
+}
+
+.member-row:first-child {
+  border-top: 0;
+}
+
+.member-avatar {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--fp-border);
+  border-radius: 10px;
+  color: var(--fp-text-secondary);
+  background: var(--fp-surface-raised);
+}
+
+.member-identity {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.member-identity strong {
+  overflow: hidden;
+  color: var(--fp-text);
+  font-size: 11.5px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-identity span {
+  overflow: hidden;
+  color: var(--fp-text-tertiary);
+  font-size: 8.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-role-control select {
+  min-width: 132px;
+  height: 34px;
+  padding: 0 28px 0 10px;
+  border: 1px solid var(--fp-border);
+  border-radius: 9px;
+  outline: none;
+  color: var(--fp-text-secondary);
+  background: var(--fp-surface-raised);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.member-role-control select:focus {
+  border-color: rgba(116, 103, 255, .68);
+}
+
+.role-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 27px;
+  padding: 0 9px;
+  border: 1px solid var(--fp-border);
+  border-radius: 999px;
+  color: var(--fp-text-secondary);
+  background: rgba(255,255,255,.035);
+  font-size: 9.5px;
+  font-weight: 650;
+}
+
+.member-created {
+  color: var(--fp-text-tertiary);
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.danger-icon-button {
+  color: var(--fp-text-tertiary);
+}
+
+.danger-icon-button:hover:not(:disabled) {
+  color: var(--fp-danger);
+  border-color: rgba(255, 107, 115, .28);
+  background: var(--fp-danger-bg);
+}
+
+.member-inline-error {
+  margin: 0 16px 14px;
+}
+
+.role-explainer {
+  margin-top: -4px;
+  padding: 10px 11px;
+  border: 1px solid var(--fp-border);
+  border-radius: 10px;
+  color: var(--fp-text-secondary);
+  background: rgba(255,255,255,.025);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+@media (max-width: 760px) {
+  .panel-header-actions {
+    gap: 6px;
+  }
+
+  .panel-header-actions .button {
+    min-height: 34px;
+    padding-inline: 10px;
+    font-size: 9.5px;
+  }
+
+  .member-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 9px;
+    padding: 12px;
+  }
+
+  .member-role-control {
+    grid-column: 2 / -1;
+    grid-row: 2;
+  }
+
+  .member-role-control select {
+    width: 100%;
+  }
+
+  .member-created {
+    grid-column: 2;
+    grid-row: 3;
+  }
+
+  .member-row > .danger-icon-button,
+  .member-row > span:last-child {
+    grid-column: 3;
+    grid-row: 1;
+  }
+}
+
+@media (max-width: 480px) {
+  .merchant-team-panel .panel-header {
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .panel-header-actions {
+    align-items: flex-end;
+    flex-direction: column;
+  }
+
+  .member-identity strong {
+    font-size: 11px;
+  }
+}

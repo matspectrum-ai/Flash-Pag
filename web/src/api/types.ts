@@ -27,11 +27,30 @@ export type MeResponse = {
   installed_providers: string[]
 }
 
+export type MemberRole = 'owner' | 'admin' | 'member' | 'viewer'
+
 export type OrganizationAccess = {
   organization_id: string
-  role: 'owner' | 'admin' | 'member' | 'platform_admin' | string
+  role: MemberRole | 'platform_admin' | string
   can_manage: boolean
+  can_manage_members: boolean
+  can_manage_admins: boolean
+  can_manage_integrations: boolean
+  can_view_sensitive_config: boolean
   can_create_customer: boolean
+  can_write_operational: boolean
+}
+
+export type MerchantMember = {
+  user_id: string
+  email: string
+  role: MemberRole
+  created_at?: string
+}
+
+export type MemberInput = {
+  email: string
+  role: MemberRole
 }
 
 export type Account = {

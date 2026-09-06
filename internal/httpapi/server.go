@@ -47,6 +47,18 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /console/api/me", s.withConsoleAuth(s.consoleMe))
 	s.mux.HandleFunc("GET /console/api/access", s.withConsoleAuth(s.consoleAccess))
 	s.mux.HandleFunc("GET /console/api/summary", s.withConsoleAuth(s.consoleSummary))
+
+	// Sensitive tenant configuration gets exact routes so read permissions are enforced
+	// server-side instead of relying on navigation visibility in the React client.
+	s.mux.HandleFunc("GET /console/api/api-keys", s.withConsoleAuth(s.consoleSensitiveList("api-keys")))
+	s.mux.HandleFunc("GET /console/api/webhook-endpoints", s.withConsoleAuth(s.consoleSensitiveList("webhook-endpoints")))
+	s.mux.HandleFunc("GET /console/api/provider-connections", s.withConsoleAuth(s.consoleSensitiveList("provider-connections")))
+
+	s.mux.HandleFunc("GET /console/api/members", s.withConsoleAuth(s.consoleMembers))
+	s.mux.HandleFunc("POST /console/api/members", s.withConsoleAuth(s.consoleCreateMember))
+	s.mux.HandleFunc("PATCH /console/api/members/{userID}", s.withConsoleAuth(s.consoleUpdateMember))
+	s.mux.HandleFunc("DELETE /console/api/members/{userID}", s.withConsoleAuth(s.consoleDeleteMember))
+
 	s.mux.HandleFunc("GET /console/api/{resource}", s.withConsoleAuth(s.consoleList))
 	s.mux.HandleFunc("POST /console/api/customers", s.withConsoleAuth(s.consoleCreateCustomer))
 	s.mux.HandleFunc("POST /console/api/api-keys", s.withConsoleAuth(s.consoleCreateAPIKey))

@@ -9,7 +9,10 @@ import type {
   CustomerInput,
   ListResponse,
   MeResponse,
+  MemberInput,
+  MemberRole,
   Merchant,
+  MerchantMember,
   Organization,
   OrganizationAccess,
   SummaryResponse,
@@ -76,6 +79,22 @@ export const api = {
     request<SummaryResponse>(withOrganization('/console/api/summary', organizationId)),
   list: <T>(resource: string, organizationId: string) =>
     request<ListResponse<T>>(withOrganization(`/console/api/${resource}`, organizationId)),
+  members: (organizationId: string) =>
+    request<ListResponse<MerchantMember>>(withOrganization('/console/api/members', organizationId)),
+  createMember: (organizationId: string, input: MemberInput) =>
+    request<MerchantMember>(withOrganization('/console/api/members', organizationId), {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  updateMemberRole: (organizationId: string, userId: string, role: MemberRole) =>
+    request<void>(withOrganization(`/console/api/members/${userId}`, organizationId), {
+      method: 'PATCH',
+      body: JSON.stringify({ role }),
+    }),
+  removeMember: (organizationId: string, userId: string) =>
+    request<void>(withOrganization(`/console/api/members/${userId}`, organizationId), {
+      method: 'DELETE',
+    }),
   createCustomer: (organizationId: string, input: CustomerInput) =>
     request<Customer>(withOrganization('/console/api/customers', organizationId), {
       method: 'POST',
