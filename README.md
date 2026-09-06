@@ -15,11 +15,13 @@ Minimal multi-provider Pix gateway: no products, no checkout, no catalog.
 - provider health checks and read-only reconciliation
 - multiple merchants -> multiple organizations -> multiple accounts
 - dashboard + platform admin panel
+- merchant KYC/KYB lifecycle and platform review
+- versioned merchant pricing with immutable transaction fee snapshots
 - Supabase Postgres + Auth
 
 ## Stack
 
-One Go 1.24 binary, standard library only. Supabase Postgres provides durable state and transactional RPCs; Supabase Auth handles dashboard identity. The dashboard is embedded HTML/CSS/vanilla JS. No Node runtime, ORM, Redis, queue service, microservices, product/checkout subsystem, or floating-point money.
+One Go 1.24 binary, standard library only. Supabase Postgres provides durable state and transactional RPCs; Supabase Auth handles dashboard identity. The React dashboard is built at image-build time and embedded in the Go binary. No Node runtime is required in the final container. There is no ORM, Redis, queue service, microservices, product/checkout subsystem, or floating-point money.
 
 ## Financial invariants
 
@@ -29,10 +31,12 @@ Amounts are integer BRL centavos. The ledger is immutable and double-entry per j
 
 Reconciliation is read-only at the PSP: Flash Pag looks up the existing provider external ID and then applies the returned status to the local ledger. It never creates another charge or another PIX OUT during reconciliation.
 
+Merchant pricing is versioned. Each transaction freezes the pricing version and exact `fee_minor` used when it is created; historical pricing is immutable.
+
 ## Local setup
 
 1. Create a separate Supabase project for Flash Pag (do not reuse Swiftpay).
-2. Apply `migrations/0001_init.sql`.
+2. Apply the migrations in numeric order.
 3. Create a Supabase Auth user for the platform admin.
 4. Bootstrap that user once:
 
@@ -54,7 +58,7 @@ set -a; source .env; set +a
 go run ./cmd/flashpag
 ```
 
-Open `http://localhost:8080/docs` for the public API docs and `http://localhost:8080/console/` for the dashboard/admin.
+Open `http://localhost:8080/docs` for the public API docs and `http://localhost:8080/app/` for the React dashboard/admin.
 
 ## Providers
 
@@ -67,7 +71,7 @@ Provider credentials are stored per organization encrypted with AES-256-GCM unde
 
 ### Pixhub
 
-Create a provider connection from the console under **Integrações** using credentials in this shape:
+Create a provider connection from the app under **Conexões** using credentials in this shape:
 
 ```json
 {
@@ -82,7 +86,7 @@ Pixhub PIX IN requires payer CPF/CNPJ, so create the customer first and pass its
 
 Pixhub PIX OUT receives the Flash Pag transaction UUID as `x-idempotency-key`, preventing the PSP operation from being duplicated on safe retries.
 
-In **Integrações**, `Testar` authenticates against Pixhub and calls only `GET /api/v1/balance`. The response is converted from Pixhub's decimal-real strings to exact integer centavos without floating-point arithmetic.
+In **Conexões**, `Testar` authenticates against Pixhub and calls only `GET /api/v1/balance`. The response is converted from Pixhub's decimal-real strings to exact integer centavos without floating-point arithmetic.
 
 In **Transações**, `Reconciliar` is available for Pixhub transactions that are `pending` or `ambiguous`. It queries the existing Pixhub transaction/transfer ID; success settles the local ledger, a final PIX OUT failure releases reserved funds, and an intermediate PSP state remains pending.
 
@@ -137,6 +141,6 @@ curl -X POST http://localhost:8080/v1/pix/charges \
 
 ## Current MVP boundary
 
-This is deliberately not a banking core. There is no checkout, product catalog, fee engine, card acquiring, KYC workflow, settlement file parser, automatic provider routing, or multi-currency accounting.
+This is deliberately not a banking core. There is no checkout, product catalog, card acquiring, settlement file parser, automatic provider routing, or multi-currency accounting. KYC/KYB and merchant fee pricing are already implemented in the current branch.
 
-Pixhub `transaction_refunded` events are persisted as provider evidence but do not yet post a compensating reversal journal. Refund/reversal ledgering remains the main financial-core item before treating the gateway as complete for unrestricted production money movement.
+Pixhub `transaction_refunded` events are persisted as provider evidence but do not yet post a compensating reversal journal. Refund/reversal ledgering remains a financial-core hardening item and is not the primary scope of Phase 3.
