@@ -30,10 +30,6 @@ func (s *Server) adminCreateMerchantWithKYC(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusInternalServerError, "merchant_create_failed", "merchant id missing from database response")
 		return
 	}
-	if err := s.sb.Do(r.Context(), http.MethodPost, "/rest/v1/merchant_kyc_profiles", nil, map[string]any{"merchant_id": merchantID, "status": "draft"}, "", nil); err != nil {
-		writeError(w, http.StatusInternalServerError, "kyc_profile_create_failed", "merchant was created but its KYC profile could not be initialized")
-		return
-	}
 	if in.OwnerUserID != "" {
 		if err := s.sb.Do(r.Context(), http.MethodPost, "/rest/v1/merchant_users", nil, map[string]any{"merchant_id": merchantID, "user_id": in.OwnerUserID, "role": "owner"}, "", nil); err != nil {
 			writeError(w, http.StatusUnprocessableEntity, "merchant_owner_failed", "merchant was created but owner assignment failed")
