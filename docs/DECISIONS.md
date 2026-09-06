@@ -65,7 +65,7 @@ Unknown provider cost is not zero. The deterministic `mock` provider is the only
 
 Status: ACCEPTED.
 
-Raw `provider_payload` must not be exposed to browser clients. Platform-admin APIs may expose sanitized derived fields such as `provider_cost_minor` only when extraction is based on explicit minor-unit evidence.
+Raw `provider_payload` must not be exposed to browser clients. Platform-admin APIs may expose sanitized derived fields such as `provider_cost_minor` only when extraction is based on a verified provider-specific cost contract.
 
 ## D-010 — Prefer existing contracts before adding Phase 3 schema
 
@@ -94,3 +94,18 @@ A phase or substantial feature is not complete merely because code was committed
 Status: ACCEPTED.
 
 Provider refund evidence may exist before compensating reversal ledgering is implemented. Refund/reversal ledgering remains an important financial-core hardening item but does not change the agreed order: Phase 3 is Admin Financeiro + Merchant 360°.
+
+## D-014 — Phase 3 global reads must never silently truncate
+
+Status: ACCEPTED.
+
+Admin Financeiro and Merchant 360° use dedicated read-only admin contracts where existing session/bootstrap contracts are intentionally bounded for UI convenience.
+
+Rules:
+- `/console/api/me` is not the source of truth for the global tenant inventory because it has bounded list limits.
+- The admin tenant inventory paginates merchants and Organizations up to an explicit safety ceiling and returns `complete=false` if that ceiling is reached.
+- Organization counts that are presented as exact use PostgREST `Prefer: count=exact`; they are not inferred from bounded list lengths.
+- Merchant membership is queried at merchant scope and remains valid even when a Merchant has zero Organizations.
+- Per-Organization transaction reads remain capped at 1,000 rows in the beta aggregation; hitting the cap must be surfaced in the UI instead of treating the metric as complete.
+
+These read contracts do not add Phase 3 persistence or migrations. A dedicated server-side financial read model should only be introduced when measured scale/latency or historical-query requirements justify the additional complexity.
