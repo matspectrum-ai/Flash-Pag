@@ -6,6 +6,7 @@ import type { ProviderConnection } from '../../api/types'
 import { useSession } from '../../app/session'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { formatBRL, formatDateTime } from '../../lib/format'
+import './connections.css'
 
 type ConnectionHealth = {
   provider?: string
