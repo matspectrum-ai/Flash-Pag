@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   ArrowLeftRight,
   BadgeCheck,
@@ -58,6 +58,14 @@ export function AppShell() {
   const canManageIntegrations = Boolean(accessQuery.data?.can_manage_integrations || me?.user.platform_admin)
   const currentRole = accessQuery.data?.role
   const canManageKYC = Boolean(me?.user.platform_admin || currentRole === 'owner' || currentRole === 'admin')
+
+  const kycQuery = useQuery({
+    queryKey: ['kyc-shell', organizationId],
+    queryFn: () => api.kyc(organizationId!),
+    enabled: Boolean(organizationId && canManageKYC),
+    staleTime: 30_000,
+  })
+  const kycStatus = kycQuery.data?.profile.status
 
   const developerItems = [
     ...(canManageIntegrations ? [
@@ -197,6 +205,16 @@ export function AppShell() {
                   <strong>Preview somente leitura</strong>
                   <span>Dados reais para inspeção visual; alterações permanecem bloqueadas.</span>
                 </div>
+              </div>
+            ) : null}
+            {canManageKYC && kycStatus && kycStatus !== 'approved' && location.pathname !== '/kyc' ? (
+              <div className="attention-banner" role="status">
+                <div className="attention-icon"><BadgeCheck size={17} /></div>
+                <div>
+                  <strong>Verificação da empresa pendente</strong>
+                  <span>Conclua o KYC/KYB para habilitar conexões e operações financeiras com providers reais.</span>
+                </div>
+                <Link className="button button-secondary" to="/kyc">Abrir verificação</Link>
               </div>
             ) : null}
             <Outlet />
