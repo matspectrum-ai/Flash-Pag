@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: Flash Pag Pix API
-  version: 0.1.0
-  description: Minimal multi-provider Pix gateway. Monetary amounts are integer centavos (BRL minor units).
+  version: 0.2.0
+  description: Minimal multi-provider Pix gateway. Monetary amounts are integer centavos (BRL minor units). Installed adapters include mock and Pixhub.
 servers:
   - url: /
 security:
@@ -29,6 +29,7 @@ paths:
     post:
       tags: [Pix]
       summary: Create a Pix charge
+      description: For provider `pixhub`, `customer_id` is required and the referenced customer must have a CPF or CNPJ in `document`. Pixhub charges have a minimum of 100 centavos.
       parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
       requestBody:
         required: true
@@ -55,6 +56,7 @@ paths:
     post:
       tags: [Pix]
       summary: Create a Pix transfer
+      description: With provider `pixhub`, Flash Pag forwards its internal operation UUID as Pixhub `x-idempotency-key`.
       parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
       requestBody:
         required: true
@@ -66,6 +68,7 @@ paths:
     post:
       tags: [Pix]
       summary: Create a withdrawal to a Pix key
+      description: Uses the same PIX OUT provider flow as transfers while retaining the local `withdrawal` kind.
       parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
       requestBody:
         required: true
@@ -156,11 +159,14 @@ components:
       required: [amount_minor]
       properties:
         account_id: {type: string, format: uuid}
-        customer_id: {type: string, format: uuid}
+        customer_id:
+          type: string
+          format: uuid
+          description: Required by Pixhub. Customer document must contain CPF or CNPJ.
         amount_minor: {$ref: '#/components/schemas/MoneyMinor'}
         currency: {type: string, default: BRL, enum: [BRL]}
         description: {type: string, maxLength: 500}
-        provider: {type: string, default: mock}
+        provider: {type: string, default: mock, enum: [mock, pixhub]}
         provider_connection_id: {type: string, format: uuid}
     CreateOutbound:
       type: object
@@ -169,9 +175,9 @@ components:
         account_id: {type: string, format: uuid}
         amount_minor: {$ref: '#/components/schemas/MoneyMinor'}
         currency: {type: string, default: BRL, enum: [BRL]}
-        pix_key: {type: string}
-        description: {type: string}
-        provider: {type: string, default: mock}
+        pix_key: {type: string, description: CPF, CNPJ, email, +55 phone or random Pix key according to the selected PSP.}
+        description: {type: string, maxLength: 500}
+        provider: {type: string, default: mock, enum: [mock, pixhub]}
         provider_connection_id: {type: string, format: uuid}
     CreateCustomer:
       type: object
@@ -179,8 +185,8 @@ components:
         external_id: {type: string}
         name: {type: string}
         email: {type: string, format: email}
-        document: {type: string}
-        metadata: {type: object, additionalProperties: true}
+        document: {type: string, description: CPF/CNPJ; punctuation is accepted and normalized by the Pixhub adapter.}
+        metadata: {type: object, additionalProperties: true, description: May include `phone`, forwarded to Pixhub when present.}
     CreateWebhook:
       type: object
       required: [url]
@@ -200,7 +206,7 @@ components:
         status: {type: string, enum: [pending, succeeded, failed, ambiguous]}
         amount_minor: {type: integer, format: int64}
         currency: {const: BRL}
-        provider_code: {type: string}
+        provider_code: {type: string, enum: [mock, pixhub]}
         provider_external_id: {type: [string, 'null']}
-        qr_code: {type: [string, 'null']}
+        qr_code: {type: [string, 'null'], description: For Pixhub PIX IN this is the EMV Pix copy-and-paste payload.}
         created_at: {type: string, format: date-time}
