@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { LockKeyhole } from 'lucide-react'
 import { useSession } from '../../app/session'
+import { BrandMark } from '../../components/brand/BrandMark'
 
 export function LoginPage() {
   const { login } = useSession()
@@ -25,18 +26,18 @@ export function LoginPage() {
   return (
     <main className="auth-page">
       <section className="auth-card" aria-labelledby="login-title">
-        <div className="brand-lockup">
-          <div className="brand-mark">F</div>
+        <div className="brand-lockup auth-brand">
+          <BrandMark className="brand-mark-large" />
           <div>
             <strong>Flash Pag</strong>
-            <span>Pix para sua operação</span>
+            <span>Infraestrutura Pix para sua operação</span>
           </div>
         </div>
 
         <div className="auth-heading">
           <div className="auth-icon"><LockKeyhole size={18} /></div>
           <h1 id="login-title">Acesse sua conta</h1>
-          <p>Entre para acompanhar saldo, transações e integrações.</p>
+          <p>Saldo, transações, transferências e integrações em um único ambiente operacional.</p>
         </div>
 
         <form onSubmit={submit} className="form-stack">
