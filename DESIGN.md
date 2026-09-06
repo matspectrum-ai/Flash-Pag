@@ -24,6 +24,7 @@ Preferred user-facing terms:
 - API Keys — programmatic credentials.
 - Webhooks — outbound event subscriptions and delivery health.
 - Documentação — API reference and integration guidance.
+- Verificação — merchant KYC/KYB and activation state.
 - Conexões — PSP/provider connections used by the organization.
 - Organização — current company/tenant settings and access context.
 - Plataforma — Flash Pag operator area for platform administrators.
@@ -54,11 +55,16 @@ Avoid in merchant-facing UI unless technically necessary:
    - Webhooks
    - Documentação
 5. Configurações
+   - Verificação
    - Conexões
    - Organização
 6. Plataforma — platform administrators only
+   - Administração
+   - KYC
 
 The organization switcher lives in the application shell and changes the context for all organization-scoped views. Do not duplicate a technical `tenant` card next to it.
+
+KYC/KYB is merchant-level even though it is reached from the selected organization context. Multiple organizations belonging to the same merchant share one verification state.
 
 ### Platform mode
 
@@ -68,6 +74,7 @@ Platform administration is a distinct operating mode, not a merchant settings pa
 - Empresas;
 - Organizações;
 - Membros e permissões;
+- KYC/KYB review;
 - Conexões/providers oversight;
 - operational health.
 
@@ -97,6 +104,8 @@ Overview answers `what needs attention?`. Detail answers `what exactly happened?
 
 IDs, provider references, webhook signatures and scopes appear when relevant, usually in detail drawers or developer surfaces.
 
+Provider choice is hidden from the primary financial flow whenever routing can resolve it safely. The merchant expresses the financial intent; Flash Pag resolves an eligible connection. Provider metadata belongs in advanced controls, investigation and configuration.
+
 ### Contextual actions
 
 Examples:
@@ -105,7 +114,8 @@ Examples:
 - transfer next to available balance;
 - provider health action inside a connection detail;
 - API key creation inside API Keys;
-- webhook test/delivery actions inside Webhooks.
+- webhook test/delivery actions inside Webhooks;
+- verification action inside the KYC/KYB status surface.
 
 ### Safe financial interaction
 
@@ -114,7 +124,9 @@ Examples:
 - repeatable requests preserve idempotency;
 - ambiguous operations are reconciled before retry;
 - irreversible/destructive actions require confirmation;
-- secrets are shown once and never redisplayed in plaintext.
+- secrets are shown once and never redisplayed in plaintext;
+- `mock` is development infrastructure and is never presented as an implicit production route;
+- real PSP operations require approved merchant verification.
 
 ## 5. Shell
 
@@ -135,6 +147,8 @@ The header contains:
 - user/account menu.
 
 Do not show a separate `Tenant` badge beside the organization selector.
+
+A merchant with incomplete verification receives a persistent but compact account-level warning with a direct route to Verificação. Do not hide KYC state only inside settings.
 
 ### Content width
 
@@ -179,12 +193,18 @@ Primary jobs:
 
 - understand spendable balance;
 - enter destination and amount;
-- choose/resolve an eligible route without exposing unnecessary PSP complexity;
+- resolve an eligible route without exposing unnecessary PSP complexity;
 - review consequence;
 - submit once;
 - monitor final state.
 
-Provider selection should not default to `mock` when a real active connection exists. Ideally routing becomes automatic and provider choice moves to an advanced control.
+Routing rules:
+
+- one eligible active real connection: select automatically and keep provider outside the primary form;
+- multiple eligible connections: choose through routing policy and expose an override only under Avançado when useful;
+- no eligible real connection: block the real operation and direct the merchant to Conexões;
+- disabled connections are never eligible;
+- `mock` is never a silent fallback for a real operation.
 
 ### Contas
 
@@ -226,41 +246,102 @@ Disabled connections do not present primary health/test actions as if they were 
 
 ## 8. Organization and tenancy UX
 
-The backend can remain multi-merchant and multi-organization. The UI should reduce cognitive load:
+The backend remains multi-merchant and multi-organization. The UI reduces cognitive load:
 
 - organization context is selected once in the shell;
 - switching context refreshes every organization-scoped query;
 - no data from multiple organizations is visually merged;
 - organization settings contain identity/access/configuration, not financial history;
-- platform administrators get a separate platform-wide mode.
+- platform administrators get a separate platform-wide mode;
+- merchant-level rules such as KYC/KYB and commercial pricing must not be duplicated independently per organization unless a deliberate override model exists.
 
-## 9. Visual foundation
+## 9. Onboarding and KYC/KYB
 
-Flash Pag should feel fast, precise, neutral and financially credible.
+Self-registration provisions one coherent commercial account:
 
-Avoid generic AI-dashboard aesthetics: excessive gradients, floating glass cards, decorative charts, huge rounded rectangles and oversized empty whitespace.
+```text
+auth user
+  -> merchant
+  -> owner membership
+  -> initial organization
+  -> default BRL account
+  -> merchant KYC/KYB profile
+```
+
+Provisioning must be transactional or compensating and retry-safe. A lost network response must not create duplicate merchants, organizations or default accounts. If authentication succeeds but provisioning fails irrecoverably, the backend attempts to roll back the just-created auth identity so the user can retry safely.
+
+KYC/KYB lifecycle:
+
+```text
+draft
+  -> submitted
+  -> under_review
+  -> approved
+  -> needs_changes
+  -> rejected
+```
+
+Allowed review transitions are deliberately constrained. Merchant data is editable in `draft`, `needs_changes` and `rejected`, and locked while submitted, under review or approved.
+
+Verification belongs to the merchant, not to an individual organization. Owners and merchant admins can maintain and submit it. Platform administrators review it in a separate platform queue.
+
+Required baseline documents are:
+
+- company articles/constitutive document;
+- CNPJ registration proof;
+- representative identity document;
+- address proof.
+
+Additional ownership, banking or requested supporting documents can be added when required by risk/compliance.
+
+Document rules:
+
+- KYC documents live in a private Storage bucket;
+- the browser never receives a public Storage URL;
+- upload and download go through authenticated Flash Pag backend routes;
+- accepted formats are PDF, JPEG and PNG;
+- maximum object size is 15 MB;
+- each object stores SHA-256 metadata;
+- replacement creates a new document version and preserves history;
+- platform-only internal review notes are never exposed to the merchant;
+- merchant-visible correction/rejection observations are explicitly separated from internal notes.
+
+Real payment infrastructure is enabled only when merchant KYC/KYB is `approved`. Development-only `mock` behavior can remain available without approval, but it must never masquerade as an eligible real route.
+
+Existing beta merchants introduced before KYC may be grandfathered as approved during the initial migration to preserve the already-running financial operation. New merchants start at `draft`.
+
+## 10. Visual foundation
+
+Flash Pag is dark by foundation, not a light dashboard with inverted background colors. Background, surfaces, elevated layers, borders, typography hierarchy, inputs, tables, drawers, skeletons, badges, state surfaces and authentication all use the same dark system.
+
+The structural reference is modern dark financial software such as Revolut, while visual identity remains Flash Pag.
+
+Avoid generic AI-dashboard aesthetics: excessive gradients, floating glass cards, decorative charts, huge rounded rectangles and oversized empty whitespace. Borders are preferred over shadows; gradients are restrained and only support hierarchy.
 
 Base tokens:
 
 ```css
---fp-bg: #f7f7f8;
---fp-surface: #ffffff;
---fp-surface-subtle: #fafafa;
---fp-surface-strong: #111114;
---fp-text: #151518;
---fp-text-secondary: #65656d;
---fp-text-tertiary: #92929b;
---fp-border: #e8e8eb;
---fp-border-strong: #d9d9de;
---fp-accent: #5b5cff;
---fp-success: #087a55;
---fp-warning: #96620b;
---fp-danger: #b4232a;
+--fp-bg: #08080a;
+--fp-bg-soft: #0a0a0c;
+--fp-surface: #111114;
+--fp-surface-raised: #17171b;
+--fp-surface-hover: #1c1c21;
+--fp-surface-strong: #202026;
+--fp-input: #121216;
+--fp-border: #26262c;
+--fp-border-strong: #34343c;
+--fp-text: #f5f5f7;
+--fp-text-secondary: #a1a1aa;
+--fp-text-tertiary: #6f6f78;
+--fp-accent: #7467ff;
+--fp-success: #5bd6a0;
+--fp-warning: #f1bd62;
+--fp-danger: #ff747e;
 ```
 
 Semantic color communicates state, not decoration.
 
-Spacing uses a 4px base. Primary panels use 12–16px radius. Borders are preferred over shadows. Shadows are reserved for transient layers.
+Spacing uses a 4px base. Primary panels use 12–16px radius. Shadows are reserved for transient layers such as dialogs/drawers and must remain restrained.
 
 Typography:
 
@@ -273,7 +354,7 @@ Typography:
 
 Secondary copy must remain readable at normal desktop zoom; do not shrink operational text simply to create visual density.
 
-## 10. Components
+## 11. Components
 
 Shared primitives must include:
 
@@ -302,9 +383,12 @@ Business components must include:
 - CustomerSummary;
 - ConnectionCard;
 - APIKeyRow;
-- WebhookEndpointRow.
+- WebhookEndpointRow;
+- KYCStatus;
+- KYCDocument;
+- KYCReviewQueue.
 
-## 11. Responsive behavior
+## 12. Responsive behavior
 
 Desktop is the primary operational target, but mobile remains first-class for monitoring and basic actions.
 
@@ -315,7 +399,9 @@ Desktop is the primary operational target, but mobile remains first-class for mo
 
 Do not transform every desktop table into unrelated mobile cards if that destroys comparison and financial meaning.
 
-## 12. Accessibility and motion
+KYC forms collapse into a single readable column on narrow screens. Document upload/review controls remain explicit and never rely on hover.
+
+## 13. Accessibility and motion
 
 - visible keyboard focus;
 - Escape closes transient layers;
@@ -327,7 +413,7 @@ Do not transform every desktop table into unrelated mobile cards if that destroy
 - 180–240ms drawer/dialog transitions;
 - honor `prefers-reduced-motion`.
 
-## 13. React application architecture
+## 14. React application architecture
 
 User-facing source lives in `web/`.
 
@@ -354,6 +440,7 @@ features/
   api-keys/
   webhooks/
   docs/
+  kyc/
   connections/
   organization/
   platform/
@@ -372,9 +459,15 @@ React + TypeScript source
 
 The existing `/console/api/*` HTTP contracts may remain temporarily as private implementation detail during migration. New user-facing navigation uses `/app/*`.
 
-## 14. Definition of done
+## 15. Commercial pricing boundary
 
-A page is done only when:
+Merchant pricing is a platform-administered commercial rule, not a global fixed fee and not an organization setting by default.
+
+The pricing implementation belongs to the financial/pricing phase and must support versioned merchant-specific rules and immutable transaction-level pricing snapshots. Editing a merchant's current fee must never rewrite the economics of historical transactions.
+
+## 16. Definition of done
+
+A page or workflow is done only when:
 
 - its navigation name matches the user's job;
 - hierarchy starts with money/task state rather than backend metadata;
@@ -384,4 +477,6 @@ A page is done only when:
 - actions have clear financial consequence;
 - responsive behavior remains usable;
 - no raw development-only control remains visible;
-- no backend contract was silently weakened for visual convenience.
+- no backend contract was silently weakened for visual convenience;
+- authorization and tenant isolation are enforced server-side;
+- financially or compliance-sensitive state transitions are testable and auditable.
