@@ -54,10 +54,12 @@ Status: ACCEPTED.
 
 Admin financial metrics use these exact semantics:
 - TPV: processed volume, currently successful `pix_in` within the selected period.
-- Flash Pag revenue: fees charged by Flash Pag, represented by frozen transaction `fee_minor`.
+- Flash Pag revenue: fees realized by Flash Pag on successful transactions, using the transaction's frozen `fee_minor`.
 - Provider cost: actual provider cost supported by explicit, trustworthy provider evidence.
 - Margin: Flash Pag revenue minus provider cost, only when provider-cost coverage is complete.
 - Net profit: prohibited as a metric until all other relevant costs are modeled.
+
+A frozen `fee_minor` on a pending, failed or ambiguous transaction remains the immutable commercial pricing snapshot for that transaction; it is not presented or aggregated as realized Flash Pag revenue until the transaction succeeds.
 
 Unknown provider cost is not zero. The deterministic `mock` provider is the only intentional zero-cost exception in the current implementation.
 
@@ -109,3 +111,11 @@ Rules:
 - Per-Organization transaction reads remain capped at 1,000 rows in the beta aggregation; hitting the cap must be surfaced in the UI instead of treating the metric as complete.
 
 These read contracts do not add Phase 3 persistence or migrations. A dedicated server-side financial read model should only be introduced when measured scale/latency or historical-query requirements justify the additional complexity.
+
+## D-015 — Admin finance uses an explicit Brazil business calendar
+
+Status: ACCEPTED.
+
+Admin Financeiro and Merchant 360° period filters and daily financial buckets use `America/Sao_Paulo` as the business timezone. Browser-local timezone and raw UTC calendar dates must not independently determine 7/30/90-day membership or daily TPV buckets.
+
+This keeps the same Pix near midnight in the same reporting day for every platform administrator regardless of where their browser is running.
