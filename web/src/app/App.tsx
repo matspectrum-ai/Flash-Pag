@@ -5,7 +5,6 @@ import { LoginPage } from '../features/auth/LoginPage'
 import { ConnectionsPage } from '../features/connections/ConnectionsPage'
 import { HomePage } from '../features/home/HomePage'
 import { TransactionsPage } from '../features/transactions/TransactionsPage'
-import { TransfersPage } from '../features/transfers/TransfersPage'
 import { AccountsPage } from '../features/accounts/AccountsPage'
 import { useSession } from './session'
 
@@ -47,7 +46,6 @@ export function App() {
       <Route element={<AppShell />}>
         <Route index element={<HomePage />} />
         <Route path="transactions" element={<TransactionsPage />} />
-        <Route path="transfers" element={<TransfersPage />} />
         <Route path="accounts" element={<AccountsPage />} />
         <Route path="customers" element={<MigrationPlaceholder name="customers" />} />
         <Route path="api-keys" element={<MigrationPlaceholder name="api-keys" />} />
