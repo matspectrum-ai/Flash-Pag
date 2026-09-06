@@ -1,8 +1,10 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -107,22 +109,52 @@ func (s *Server) adminSetPricing(w http.ResponseWriter, r *http.Request) {
 
 // Transactions are exposed through an exact route so fee/pricing fields can evolve
 // without coupling the merchant UI to the legacy generic console resource map.
+// Provider payloads remain server-side. Only platform admins receive a sanitized
+// provider_cost_minor when the provider evidence contains an explicit minor-unit cost.
 func (s *Server) consolePricedTransactions(w http.ResponseWriter, r *http.Request) {
 	orgID, ok := s.organizationFromConsole(r)
 	if !ok {
 		writeError(w, http.StatusForbidden, "organization_forbidden", "select an organization you can access")
 		return
 	}
+	limit := 100
+	if raw := strings.TrimSpace(r.URL.Query().Get("limit")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			if parsed > 1000 {
+				parsed = 1000
+			}
+			limit = parsed
+		}
+	}
 	q := url.Values{
 		"organization_id": {"eq." + orgID},
-		"select":          {"id,account_id,customer_id,provider_connection_id,provider_code,provider_external_id,kind,direction,status,amount_minor,fee_minor,pricing_version_id,pricing_version,currency,description,pix_key,failure_code,failure_message,created_at,updated_at"},
+		"select":          {"id,account_id,customer_id,provider_connection_id,provider_code,provider_external_id,kind,direction,status,amount_minor,fee_minor,pricing_version_id,pricing_version,currency,description,pix_key,failure_code,failure_message,provider_payload,created_at,updated_at"},
 		"order":           {"created_at.desc"},
-		"limit":           {"100"},
+		"limit":           {strconv.Itoa(limit)},
 	}
 	var rows []map[string]any
 	if err := s.sb.Do(r.Context(), http.MethodGet, "/rest/v1/transactions", q, nil, "", &rows); err != nil {
 		writeError(w, http.StatusInternalServerError, "database_error", err.Error())
 		return
+	}
+	platformAdmin := consoleP(r.Context()).Admin
+	for _, row := range rows {
+		payload := row["provider_payload"]
+		delete(row, "provider_payload")
+		if !platformAdmin {
+			continue
+		}
+		raw, err := json.Marshal(payload)
+		if err != nil {
+			row["provider_cost_minor"] = nil
+			continue
+		}
+		providerCode, _ := row["provider_code"].(string)
+		if cost, known := providerCostMinor(providerCode, raw); known {
+			row["provider_cost_minor"] = cost
+		} else {
+			row["provider_cost_minor"] = nil
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"data": rows})
 }
