@@ -16,8 +16,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22.x'
-          cache: npm
-          cache-dependency-path: web/package.json
       - name: Install web dependencies
         working-directory: web
         run: npm install --no-audit --no-fund
