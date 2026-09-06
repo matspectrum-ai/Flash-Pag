@@ -19,6 +19,23 @@ export function formatDateTime(value?: string) {
   }).format(date)
 }
 
+export function maskDocument(value?: string) {
+  if (!value) return '—'
+  const digits = value.replace(/\D/g, '')
+  if (digits.length <= 4) return '••••'
+  return `${'•'.repeat(Math.min(8, digits.length - 4))}${digits.slice(-4)}`
+}
+
+export function roleLabel(role?: string) {
+  const labels: Record<string, string> = {
+    owner: 'Proprietário',
+    admin: 'Administrador',
+    member: 'Membro',
+    platform_admin: 'Administrador da plataforma',
+  }
+  return labels[role || ''] || role || '—'
+}
+
 export function transactionLabel(kind?: string) {
   const labels: Record<string, string> = {
     pix_in: 'Pix recebido',
@@ -37,6 +54,7 @@ export function statusLabel(status?: string) {
     failed: 'Falhou',
     active: 'Ativa',
     disabled: 'Desativada',
+    revoked: 'Revogada',
   }
   return labels[status || ''] || status || '—'
 }
