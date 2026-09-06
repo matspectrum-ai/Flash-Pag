@@ -117,6 +117,13 @@ export function Merchant360Page() {
     || kycQuery.isError
     || pricingQuery.isError
     || membersQuery.isError
+  const providerCostDisplay = financeLoading
+    ? '…'
+    : finance.metrics.providerCostComplete
+      ? formatBRL(finance.metrics.providerCostMinor)
+      : finance.metrics.providerCostKnownCount > 0
+        ? `${formatBRL(finance.metrics.providerCostMinor)} confirmado`
+        : 'Indisponível'
 
   if (!platformAdmin) {
     return <div className="error-state"><CircleAlert size={22} /><strong>Acesso restrito à plataforma.</strong><span>Merchant 360° é exclusivo da administração Flash Pag.</span></div>
@@ -145,9 +152,9 @@ export function Merchant360Page() {
       {readError ? <div className="attention-banner"><div className="attention-icon"><CircleAlert size={17} /></div><div><strong>Leitura administrativa parcial</strong><span>Uma ou mais fontes do Merchant 360° falharam. Campos indisponíveis são sinalizados e não devem ser interpretados como valores vazios ou zero.</span></div></div> : null}
 
       <section className="admin-finance-metrics">
-        <article className="metric-card admin-metric-card"><div className="metric-label"><Activity size={16} /><span>TPV · Pix recebido</span></div><strong>{financeLoading ? '…' : formatBRL(finance.metrics.tpvMinor)}</strong><span className="metric-detail">Volume concluído no período</span></article>
-        <article className="metric-card admin-metric-card"><div className="metric-label"><CircleDollarSign size={16} /><span>Receita Flash Pag</span></div><strong>{financeLoading ? '…' : formatBRL(finance.metrics.revenueMinor)}</strong><span className="metric-detail">Taxas cobradas do merchant</span></article>
-        <article className="metric-card admin-metric-card"><div className="metric-label"><ReceiptText size={16} /><span>Custo provider confirmado</span></div><strong>{financeLoading ? '…' : formatBRL(finance.metrics.providerCostMinor)}</strong><span className="metric-detail">{finance.metrics.providerCostComplete ? 'Cobertura completa' : `${finance.metrics.providerCostMissingCount} Pix sem custo explícito`}</span></article>
+        <article className="metric-card admin-metric-card"><div className="metric-label"><Activity size={16} /><span>TPV · Pix recebido</span></div><strong>{financeLoading ? '…' : formatBRL(finance.metrics.tpvMinor)}</strong><span className="metric-detail">Volume concluído no período · horário de Brasília</span></article>
+        <article className="metric-card admin-metric-card"><div className="metric-label"><CircleDollarSign size={16} /><span>Receita Flash Pag</span></div><strong>{financeLoading ? '…' : formatBRL(finance.metrics.revenueMinor)}</strong><span className="metric-detail">Taxas realizadas em Pix concluído</span></article>
+        <article className="metric-card admin-metric-card"><div className="metric-label"><ReceiptText size={16} /><span>Custo provider confirmado</span></div><strong>{providerCostDisplay}</strong><span className="metric-detail">{finance.metrics.providerCostComplete ? 'Cobertura completa' : `${finance.metrics.providerCostKnownCount} com custo confirmado · ${finance.metrics.providerCostMissingCount} sem evidência`}</span></article>
         <article className="metric-card admin-metric-card"><div className="metric-label"><TrendingUp size={16} /><span>Margem</span></div><strong>{financeLoading ? '…' : finance.metrics.marginMinor == null ? 'Indisponível' : formatBRL(finance.metrics.marginMinor)}</strong><span className="metric-detail">Receita − custo provider; não é lucro líquido</span></article>
       </section>
 
@@ -216,7 +223,7 @@ export function Merchant360Page() {
 
       <section className="panel">
         <div className="panel-header"><div><h2>Pix recentes</h2><p>Visão consolidada das organizações. Transferências e saques não aparecem aqui.</p></div><span className="count-pill">{recentTransactions.length}</span></div>
-        <div className="table-wrap"><table className="data-table admin-finance-table"><thead><tr><th>Data</th><th>Organização</th><th>Status</th><th>Valor</th><th>Receita</th><th>Custo provider</th><th>Margem</th></tr></thead><tbody>{recentTransactions.map(({ transaction, organization }) => { const margin = transactionMarginMinor(transaction); return <tr key={transaction.id}><td>{formatDateTime(transaction.created_at)}</td><td><strong>{organization.name}</strong><span>{transaction.provider_code || '—'}</span></td><td><StatusBadge status={transaction.status} /></td><td>{formatBRL(transaction.amount_minor)}</td><td>{formatBRL(transaction.fee_minor ?? 0)}</td><td>{typeof transaction.provider_cost_minor === 'number' ? formatBRL(transaction.provider_cost_minor) : '—'}</td><td>{margin == null ? '—' : formatBRL(margin)}</td></tr> })}{!recentTransactions.length && !financeLoading ? <tr><td colSpan={7}><div className="empty-state compact-empty"><Activity size={22} /><strong>Nenhum Pix no período</strong><span>Não há Pix recebido para exibir nesta janela.</span></div></td></tr> : null}</tbody></table></div>
+        <div className="table-wrap"><table className="data-table admin-finance-table"><thead><tr><th>Data</th><th>Organização</th><th>Status</th><th>Valor</th><th>Receita</th><th>Custo provider</th><th>Margem</th></tr></thead><tbody>{recentTransactions.map(({ transaction, organization }) => { const margin = transactionMarginMinor(transaction); const realizedRevenue = transaction.status === 'succeeded' ? formatBRL(transaction.fee_minor ?? 0) : '—'; return <tr key={transaction.id}><td>{formatDateTime(transaction.created_at)}</td><td><strong>{organization.name}</strong><span>{transaction.provider_code || '—'}</span></td><td><StatusBadge status={transaction.status} /></td><td>{formatBRL(transaction.amount_minor)}</td><td>{realizedRevenue}</td><td>{typeof transaction.provider_cost_minor === 'number' ? formatBRL(transaction.provider_cost_minor) : '—'}</td><td>{margin == null ? '—' : formatBRL(margin)}</td></tr> })}{!recentTransactions.length && !financeLoading ? <tr><td colSpan={7}><div className="empty-state compact-empty"><Activity size={22} /><strong>Nenhum Pix no período</strong><span>Não há Pix recebido para exibir nesta janela.</span></div></td></tr> : null}</tbody></table></div>
       </section>
     </div>
   )
