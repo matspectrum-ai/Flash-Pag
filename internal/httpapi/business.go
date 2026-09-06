@@ -6,8 +6,10 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"net"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/matspectrum-ai/Flash-Pag/internal/provider"
 )
@@ -150,6 +152,9 @@ func (s *Server) providerCallbackURL(conn provider.Connection) string {
 	if conn.ID == "" || conn.ProviderCode == "" || s.cfg.PublicURL == "" {
 		return ""
 	}
+	if isLoopbackURL(s.cfg.PublicURL) {
+		return ""
+	}
 	callback := s.cfg.PublicURL + "/providers/" + conn.ProviderCode + "/webhooks/" + conn.ID
 	var secrets struct {
 		WebhookToken string `json:"webhook_token"`
@@ -158,6 +163,24 @@ func (s *Server) providerCallbackURL(conn provider.Connection) string {
 		callback += "?token=" + url.QueryEscape(secrets.WebhookToken)
 	}
 	return callback
+}
+
+// isLoopbackURL reports whether raw is an http(s) URL whose hostname is a
+// loopback address or name. Providers cannot reach such callbacks, and some
+// reject the charge outright, so callers must omit the webhook URL instead.
+func isLoopbackURL(raw string) bool {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || u.Hostname() == "" {
+		return true
+	}
+	host := strings.ToLower(u.Hostname())
+	if host == "localhost" || strings.HasSuffix(host, ".localhost") {
+		return true
+	}
+	if ip := net.ParseIP(strings.Trim(host, "[]")); ip != nil {
+		return ip.IsLoopback()
+	}
+	return false
 }
 
 func (s *Server) claimIdempotency(ctx context.Context, orgID, operation, key, fp, resourceID string) (idempotencyClaim, error) {
