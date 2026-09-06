@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError } from '../api/client'
-import type { MeResponse, Organization } from '../api/types'
+import type { MeResponse, Organization, RegisterResult } from '../api/types'
 
 type SessionContextValue = {
   me?: MeResponse
@@ -11,6 +11,7 @@ type SessionContextValue = {
   organizationId?: string
   setOrganizationId: (id: string) => void
   refreshMe: () => Promise<void>
+  register: (merchantName: string, email: string, password: string) => Promise<RegisterResult>
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
 }
@@ -30,10 +31,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     staleTime: 30_000,
   })
 
+  const registerMutation = useMutation({
+    mutationFn: ({ merchantName, email, password }: { merchantName: string; email: string; password: string }) => api.register(merchantName, email, password),
+  })
   const loginMutation = useMutation({
     mutationFn: ({ email, password }: { email: string; password: string }) => api.login(email, password),
   })
-
   const logoutMutation = useMutation({ mutationFn: api.logout })
 
   const me = meQuery.data
@@ -53,6 +56,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   const refreshMe = async () => {
     await queryClient.invalidateQueries({ queryKey: ['me'] })
+  }
+
+  const register = async (merchantName: string, email: string, password: string) => {
+    const result = await registerMutation.mutateAsync({ merchantName, email, password })
+    if (result.authenticated) await refreshMe()
+    return result
   }
 
   const login = async (email: string, password: string) => {
@@ -79,6 +88,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       organizationId: organization?.id,
       setOrganizationId,
       refreshMe,
+      register,
       login,
       logout,
     }),

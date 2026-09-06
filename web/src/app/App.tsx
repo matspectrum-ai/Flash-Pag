@@ -10,8 +10,10 @@ import { CustomersPage } from '../features/customers/CustomersPage'
 import { ApiKeysPage } from '../features/api-keys/ApiKeysPage'
 import { WebhooksPage } from '../features/webhooks/WebhooksPage'
 import { DocsPage } from '../features/docs/DocsPage'
+import { KYCPage } from '../features/kyc/KYCPage'
 import { OrganizationPage } from '../features/organization/OrganizationPage'
 import { PlatformPage } from '../features/platform/PlatformPage'
+import { PlatformKYCPage } from '../features/platform/PlatformKYCPage'
 import { useSession } from './session'
 
 export function App() {
@@ -38,9 +40,11 @@ export function App() {
         <Route path="api-keys" element={<ApiKeysPage />} />
         <Route path="webhooks" element={<WebhooksPage />} />
         <Route path="docs" element={<DocsPage />} />
+        <Route path="kyc" element={<KYCPage />} />
         <Route path="connections" element={<ConnectionsPage />} />
         <Route path="organization" element={<OrganizationPage />} />
         <Route path="platform" element={<PlatformPage />} />
+        <Route path="platform/kyc" element={<PlatformKYCPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>

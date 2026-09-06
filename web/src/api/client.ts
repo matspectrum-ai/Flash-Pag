@@ -1,4 +1,5 @@
 import type {
+  AdminKYCDetail,
   AdminMerchantInput,
   AdminOrganizationInput,
   ApiErrorShape,
@@ -7,6 +8,11 @@ import type {
   CreatedWebhookEndpoint,
   Customer,
   CustomerInput,
+  KYCProfile,
+  KYCProfileInput,
+  KYCResponse,
+  KYCDocument,
+  KYCDocumentType,
   ListResponse,
   MeResponse,
   MemberInput,
@@ -15,6 +21,8 @@ import type {
   MerchantMember,
   Organization,
   OrganizationAccess,
+  PlatformKYCRow,
+  RegisterResult,
   SummaryResponse,
   Transaction,
   WebhookInput,
@@ -23,23 +31,26 @@ import type {
 export class ApiError extends Error {
   status: number
   code?: string
+  missing?: string[]
 
-  constructor(message: string, status: number, code?: string) {
+  constructor(message: string, status: number, code?: string, missing?: string[]) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.code = code
+    this.missing = missing
   }
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const headers = new Headers(init?.headers)
+  if (!(init?.body instanceof FormData) && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json')
+  }
   const response = await fetch(path, {
     credentials: 'same-origin',
-    headers: {
-      'Content-Type': 'application/json',
-      ...init?.headers,
-    },
     ...init,
+    headers,
   })
 
   if (!response.ok) {
@@ -53,6 +64,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       payload?.error?.message || `Erro HTTP ${response.status}`,
       response.status,
       payload?.error?.code,
+      payload?.error?.missing,
     )
   }
 
@@ -67,6 +79,11 @@ function withOrganization(path: string, organizationId: string) {
 
 export const api = {
   me: () => request<MeResponse>('/console/api/me'),
+  register: (merchantName: string, email: string, password: string) =>
+    request<RegisterResult>('/console/register', {
+      method: 'POST',
+      body: JSON.stringify({ merchant_name: merchantName, organization_name: merchantName, email, password }),
+    }),
   login: (email: string, password: string) =>
     request<{ ok: boolean }>('/console/session', {
       method: 'POST',
@@ -95,6 +112,24 @@ export const api = {
     request<void>(withOrganization(`/console/api/members/${userId}`, organizationId), {
       method: 'DELETE',
     }),
+  kyc: (organizationId: string) => request<KYCResponse>(withOrganization('/console/api/kyc', organizationId)),
+  updateKYC: (organizationId: string, input: KYCProfileInput) =>
+    request<KYCProfile>(withOrganization('/console/api/kyc', organizationId), {
+      method: 'PATCH',
+      body: JSON.stringify(input),
+    }),
+  uploadKYCDocument: (organizationId: string, documentType: KYCDocumentType, file: File) => {
+    const data = new FormData()
+    data.append('file', file)
+    return request<KYCDocument>(withOrganization(`/console/api/kyc/documents?type=${encodeURIComponent(documentType)}`, organizationId), {
+      method: 'POST',
+      body: data,
+    })
+  },
+  kycDocumentURL: (organizationId: string, documentId: string) =>
+    withOrganization(`/console/api/kyc/documents/${encodeURIComponent(documentId)}`, organizationId),
+  submitKYC: (organizationId: string) =>
+    request<KYCProfile>(withOrganization('/console/api/kyc/submit', organizationId), { method: 'POST', body: '{}' }),
   createCustomer: (organizationId: string, input: CustomerInput) =>
     request<Customer>(withOrganization('/console/api/customers', organizationId), {
       method: 'POST',
@@ -128,6 +163,20 @@ export const api = {
       withOrganization(`/console/api/transactions/${transactionId}/reconcile`, organizationId),
       { method: 'POST', body: '{}' },
     ),
+  adminKYCQueue: () => request<ListResponse<PlatformKYCRow>>('/console/api/admin/kyc'),
+  adminKYCDetail: (merchantId: string) => request<AdminKYCDetail>(`/console/api/admin/kyc/${encodeURIComponent(merchantId)}`),
+  adminKYCStartReview: (merchantId: string, internalNote = '') =>
+    request<KYCProfile>(`/console/api/admin/kyc/${encodeURIComponent(merchantId)}/review`, {
+      method: 'POST',
+      body: JSON.stringify({ internal_note: internalNote }),
+    }),
+  adminKYCDecision: (merchantId: string, decision: 'approved' | 'needs_changes' | 'rejected', publicNote: string, internalNote: string) =>
+    request<KYCProfile>(`/console/api/admin/kyc/${encodeURIComponent(merchantId)}/decision`, {
+      method: 'POST',
+      body: JSON.stringify({ decision, public_note: publicNote, internal_note: internalNote }),
+    }),
+  adminKYCDocumentURL: (merchantId: string, documentId: string) =>
+    `/console/api/admin/kyc/${encodeURIComponent(merchantId)}/documents/${encodeURIComponent(documentId)}`,
   adminCreateMerchant: (input: AdminMerchantInput) =>
     request<Merchant>('/console/api/admin/merchants', {
       method: 'POST',

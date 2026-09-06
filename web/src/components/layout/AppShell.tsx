@@ -3,9 +3,11 @@ import { useQuery } from '@tanstack/react-query'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import {
   ArrowLeftRight,
+  BadgeCheck,
   BookOpen,
   Building2,
   CircleAlert,
+  ClipboardCheck,
   Home,
   KeyRound,
   Landmark,
@@ -30,9 +32,11 @@ const pageMeta: Record<string, { title: string; subtitle?: string }> = {
   '/api-keys': { title: 'API Keys', subtitle: 'Credenciais para integração programática' },
   '/webhooks': { title: 'Webhooks', subtitle: 'Eventos e saúde das entregas' },
   '/docs': { title: 'Documentação', subtitle: 'Referência para integrar com a Flash Pag' },
+  '/kyc': { title: 'Verificação', subtitle: 'KYC/KYB da conta Merchant' },
   '/connections': { title: 'Conexões', subtitle: 'Provedores e infraestrutura de pagamento' },
   '/organization': { title: 'Organização', subtitle: 'Contexto, equipe e permissões do merchant' },
   '/platform': { title: 'Plataforma', subtitle: 'Operação administrativa da Flash Pag' },
+  '/platform/kyc': { title: 'KYC', subtitle: 'Fila de verificação de Merchants' },
 }
 
 const primaryMobilePaths = new Set(['/', '/transactions', '/customers'])
@@ -53,6 +57,7 @@ export function AppShell() {
   })
   const canManageIntegrations = Boolean(accessQuery.data?.can_manage_integrations || me?.user.platform_admin)
   const currentRole = accessQuery.data?.role
+  const canManageKYC = Boolean(me?.user.platform_admin || currentRole === 'owner' || currentRole === 'admin')
 
   const developerItems = [
     ...(canManageIntegrations ? [
@@ -62,6 +67,7 @@ export function AppShell() {
     { to: '/docs', label: 'Documentação', icon: BookOpen },
   ]
   const settingsItems = [
+    ...(canManageKYC ? [{ to: '/kyc', label: 'Verificação', icon: BadgeCheck }] : []),
     ...(canManageIntegrations ? [{ to: '/connections', label: 'Conexões', icon: Network }] : []),
     { to: '/organization', label: 'Organização', icon: Settings2 },
   ]
@@ -121,9 +127,13 @@ export function AppShell() {
           {me?.user.platform_admin ? (
             <div className="nav-group platform-nav">
               <div className="nav-group-label">Plataforma</div>
-              <NavLink to="/platform" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
+              <NavLink to="/platform" end className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
                 <Building2 size={17} strokeWidth={1.8} />
                 <span>Administração</span>
+              </NavLink>
+              <NavLink to="/platform/kyc" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
+                <ClipboardCheck size={17} strokeWidth={1.8} />
+                <span>KYC</span>
               </NavLink>
             </div>
           ) : null}
@@ -263,6 +273,10 @@ export function AppShell() {
                       <NavLink to="/platform" className={({ isActive }) => `mobile-sheet-link${isActive ? ' active' : ''}`}>
                         <span className="mobile-sheet-icon"><Building2 size={18} strokeWidth={1.8} /></span>
                         <strong>Administração</strong>
+                      </NavLink>
+                      <NavLink to="/platform/kyc" className={({ isActive }) => `mobile-sheet-link${isActive ? ' active' : ''}`}>
+                        <span className="mobile-sheet-icon"><ClipboardCheck size={18} strokeWidth={1.8} /></span>
+                        <strong>KYC</strong>
                       </NavLink>
                     </div>
                   </div>

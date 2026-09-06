@@ -40,13 +40,24 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /docs", s.docs)
 	s.mux.HandleFunc("GET /openapi.yaml", s.openapi)
 
-	// Private application API. The /console prefix is retained during the React migration
-	// as an implementation detail and is not exposed as product terminology in the UI.
+	// Authentication and merchant onboarding.
+	s.mux.HandleFunc("POST /console/register", s.register)
 	s.mux.HandleFunc("POST /console/session", s.login)
 	s.mux.HandleFunc("DELETE /console/session", s.logout)
+
+	// Private application API. The /console prefix is retained during the React migration
+	// as an implementation detail and is not exposed as product terminology in the UI.
 	s.mux.HandleFunc("GET /console/api/me", s.withConsoleAuth(s.consoleMe))
 	s.mux.HandleFunc("GET /console/api/access", s.withConsoleAuth(s.consoleAccess))
 	s.mux.HandleFunc("GET /console/api/summary", s.withConsoleAuth(s.consoleSummary))
+
+	// Merchant-level KYC/KYB. Documents are served through authenticated backend proxies;
+	// the private Storage bucket is never exposed directly to the browser.
+	s.mux.HandleFunc("GET /console/api/kyc", s.withConsoleAuth(s.consoleKYC))
+	s.mux.HandleFunc("PATCH /console/api/kyc", s.withConsoleAuth(s.consoleUpdateKYC))
+	s.mux.HandleFunc("POST /console/api/kyc/documents", s.withConsoleAuth(s.consoleUploadKYCDocument))
+	s.mux.HandleFunc("GET /console/api/kyc/documents/{id}", s.withConsoleAuth(s.consoleDownloadKYCDocument))
+	s.mux.HandleFunc("POST /console/api/kyc/submit", s.withConsoleAuth(s.consoleSubmitKYC))
 
 	// Sensitive tenant configuration gets exact routes so read permissions are enforced
 	// server-side instead of relying on navigation visibility in the React client.
@@ -63,22 +74,29 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /console/api/customers", s.withConsoleAuth(s.consoleCreateCustomer))
 	s.mux.HandleFunc("POST /console/api/api-keys", s.withConsoleAuth(s.consoleCreateAPIKey))
 	s.mux.HandleFunc("DELETE /console/api/api-keys/{id}", s.withConsoleAuth(s.consoleRevokeAPIKey))
-	s.mux.HandleFunc("POST /console/api/provider-connections", s.withConsoleAuth(s.consoleCreateProviderConnection))
+	s.mux.HandleFunc("POST /console/api/provider-connections", s.withConsoleAuth(s.withKYCApprovedConsole(s.consoleCreateProviderConnection)))
 	s.mux.HandleFunc("POST /console/api/provider-connections/{id}/test", s.withConsoleAuth(s.consoleTestProviderConnection))
 	s.mux.HandleFunc("POST /console/api/transactions/{id}/reconcile", s.withConsoleAuth(s.consoleReconcileTransaction))
 	s.mux.HandleFunc("POST /console/api/webhook-endpoints", s.withConsoleAuth(s.consoleCreateWebhook))
 	s.mux.HandleFunc("DELETE /console/api/webhook-endpoints/{id}", s.withConsoleAuth(s.consoleDeleteWebhook))
-	s.mux.HandleFunc("POST /console/api/transfers", s.withConsoleAuth(s.consoleCreateTransfer))
-	s.mux.HandleFunc("POST /console/api/withdrawals", s.withConsoleAuth(s.consoleCreateWithdrawal))
-	s.mux.HandleFunc("POST /console/api/admin/merchants", s.withAdmin(s.adminCreateMerchant))
+	s.mux.HandleFunc("POST /console/api/transfers", s.withConsoleAuth(s.withKYCApprovedConsole(s.consoleCreateTransfer)))
+	s.mux.HandleFunc("POST /console/api/withdrawals", s.withConsoleAuth(s.withKYCApprovedConsole(s.consoleCreateWithdrawal)))
+
+	// Platform administration.
+	s.mux.HandleFunc("GET /console/api/admin/kyc", s.withAdmin(s.adminKYCQueue))
+	s.mux.HandleFunc("GET /console/api/admin/kyc/{merchantID}", s.withAdmin(s.adminKYCDetail))
+	s.mux.HandleFunc("GET /console/api/admin/kyc/{merchantID}/documents/{id}", s.withAdmin(s.adminDownloadKYCDocument))
+	s.mux.HandleFunc("POST /console/api/admin/kyc/{merchantID}/review", s.withAdmin(s.adminStartKYCReview))
+	s.mux.HandleFunc("POST /console/api/admin/kyc/{merchantID}/decision", s.withAdmin(s.adminDecideKYC))
+	s.mux.HandleFunc("POST /console/api/admin/merchants", s.withAdmin(s.adminCreateMerchantWithKYC))
 	s.mux.HandleFunc("POST /console/api/admin/organizations", s.withAdmin(s.adminCreateOrganization))
 	s.mux.HandleFunc("POST /console/api/admin/members", s.withAdmin(s.adminAddMember))
 
 	s.mux.HandleFunc("GET /v1/balance", s.withAPIScope("balance:read", s.getBalance))
-	s.mux.HandleFunc("POST /v1/pix/charges", s.withAPIScope("pix:write", s.createCharge))
+	s.mux.HandleFunc("POST /v1/pix/charges", s.withAPIScope("pix:write", s.withKYCApprovedAPI(s.createCharge)))
 	s.mux.HandleFunc("GET /v1/pix/charges/{id}", s.withAPIScope("pix:read", s.getTransaction))
-	s.mux.HandleFunc("POST /v1/transfers", s.withAPIScope("pix:write", s.createTransfer))
-	s.mux.HandleFunc("POST /v1/withdrawals", s.withAPIScope("pix:write", s.createWithdrawal))
+	s.mux.HandleFunc("POST /v1/transfers", s.withAPIScope("pix:write", s.withKYCApprovedAPI(s.createTransfer)))
+	s.mux.HandleFunc("POST /v1/withdrawals", s.withAPIScope("pix:write", s.withKYCApprovedAPI(s.createWithdrawal)))
 	s.mux.HandleFunc("GET /v1/transactions", s.withAPIScope("pix:read", s.listTransactions))
 	s.mux.HandleFunc("GET /v1/accounts", s.withAPIScope("balance:read", s.listAccounts))
 	s.mux.HandleFunc("GET /v1/customers", s.withAPIScope("customers:read", s.listCustomers))
