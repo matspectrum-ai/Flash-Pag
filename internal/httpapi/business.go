@@ -26,6 +26,9 @@ type transaction struct {
 	Direction            string  `json:"direction"`
 	Status               string  `json:"status"`
 	AmountMinor          int64   `json:"amount_minor"`
+	FeeMinor             int64   `json:"fee_minor"`
+	PricingVersionID     string  `json:"pricing_version_id"`
+	PricingVersion       int     `json:"pricing_version"`
 	Currency             string  `json:"currency"`
 	Description          *string `json:"description"`
 	PixKey               *string `json:"pix_key"`
@@ -193,7 +196,7 @@ func (s *Server) finishIdempotency(ctx context.Context, orgID, operation, key, s
 }
 
 func (s *Server) fetchTransaction(ctx context.Context, orgID, id string) (transaction, error) {
-	q := url.Values{"id": {"eq." + id}, "organization_id": {"eq." + orgID}, "select": {"id,organization_id,account_id,customer_id,provider_connection_id,provider_code,provider_external_id,kind,direction,status,amount_minor,currency,description,pix_key,qr_code,failure_code,failure_message,created_at,updated_at"}, "limit": {"1"}}
+	q := url.Values{"id": {"eq." + id}, "organization_id": {"eq." + orgID}, "select": {"id,organization_id,account_id,customer_id,provider_connection_id,provider_code,provider_external_id,kind,direction,status,amount_minor,fee_minor,pricing_version_id,pricing_version,currency,description,pix_key,qr_code,failure_code,failure_message,created_at,updated_at"}, "limit": {"1"}}
 	var rows []transaction
 	if err := s.sb.Do(ctx, http.MethodGet, "/rest/v1/transactions", q, nil, "", &rows); err != nil {
 		return transaction{}, err
