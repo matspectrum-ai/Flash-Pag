@@ -45,6 +45,7 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 	for attempt := 0; attempt < 3; attempt++ {
 		suffix, tokenErr := id.Token(3)
 		if tokenErr != nil {
+			_ = s.sb.DeleteAuthUser(r.Context(), signup.UserID)
 			writeError(w, http.StatusInternalServerError, "provision_failed", "account could not be provisioned")
 			return
 		}
@@ -60,7 +61,11 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if !provisioned {
-		writeError(w, http.StatusInternalServerError, "provision_failed", "user was created but merchant provisioning failed; contact support before retrying")
+		if cleanupErr := s.sb.DeleteAuthUser(r.Context(), signup.UserID); cleanupErr != nil {
+			writeError(w, http.StatusInternalServerError, "provision_failed_orphan", "user was created but merchant provisioning and automatic rollback failed; contact support before retrying")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "provision_failed", "merchant provisioning failed and the signup was rolled back; retry safely")
 		return
 	}
 
