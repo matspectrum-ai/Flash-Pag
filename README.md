@@ -12,6 +12,7 @@ Minimal multi-provider Pix gateway: no products, no checkout, no catalog.
 - outbound merchant webhooks with HMAC + durable retry
 - provider callback ingestion
 - provider adapters as Go plugins/interfaces
+- provider health checks and read-only reconciliation
 - multiple merchants -> multiple organizations -> multiple accounts
 - dashboard + platform admin panel
 - Supabase Postgres + Auth
@@ -25,6 +26,8 @@ One Go 1.24 binary, standard library only. Supabase Postgres provides durable st
 Amounts are integer BRL centavos. The ledger is immutable and double-entry per journal. `pix_in` credits `available` only after provider success. `transfer`/`withdrawal` atomically move `available -> reserved` before the provider call; success moves `reserved -> clearing`, final failure releases `reserved -> available`, and ambiguous provider outcomes keep funds reserved.
 
 `Idempotency-Key` is mandatory for financial POSTs. A key is scoped by organization + operation and bound to a semantic request fingerprint.
+
+Reconciliation is read-only at the PSP: Flash Pag looks up the existing provider external ID and then applies the returned status to the local ledger. It never creates another charge or another PIX OUT during reconciliation.
 
 ## Local setup
 
@@ -58,7 +61,7 @@ Open `http://localhost:8080/docs` for the public API docs and `http://localhost:
 The repository includes two adapters:
 
 - `mock`: deterministic development adapter; never moves real money.
-- `pixhub`: live Pixhub API v1 adapter for PIX IN, PIX OUT and authenticated provider callbacks.
+- `pixhub`: live Pixhub API v1 adapter for PIX IN, PIX OUT, balance health checks, reconciliation and authenticated provider callbacks.
 
 Provider credentials are stored per organization encrypted with AES-256-GCM under `APP_MASTER_KEY_B64`; plaintext secrets are never returned by list endpoints and must never be committed to Git.
 
@@ -78,6 +81,10 @@ Flash Pag automatically adds a random encrypted `webhook_token` to the connectio
 Pixhub PIX IN requires payer CPF/CNPJ, so create the customer first and pass its `customer_id` when creating a charge. The adapter infers `cpf` or `cnpj` from the normalized document length.
 
 Pixhub PIX OUT receives the Flash Pag transaction UUID as `x-idempotency-key`, preventing the PSP operation from being duplicated on safe retries.
+
+In **Integrações**, `Testar` authenticates against Pixhub and calls only `GET /api/v1/balance`. The response is converted from Pixhub's decimal-real strings to exact integer centavos without floating-point arithmetic.
+
+In **Transações**, `Reconciliar` is available for Pixhub transactions that are `pending` or `ambiguous`. It queries the existing Pixhub transaction/transfer ID; success settles the local ledger, a final PIX OUT failure releases reserved funds, and an intermediate PSP state remains pending.
 
 Example customer:
 
@@ -130,6 +137,6 @@ curl -X POST http://localhost:8080/v1/pix/charges \
 
 ## Current MVP boundary
 
-This is deliberately not a banking core. There is no checkout, product catalog, fee engine, card acquiring, KYC workflow, settlement file parser, reconciliation UI, automatic provider routing, or multi-currency accounting.
+This is deliberately not a banking core. There is no checkout, product catalog, fee engine, card acquiring, KYC workflow, settlement file parser, automatic provider routing, or multi-currency accounting.
 
-Pixhub `transaction_refunded` events are persisted as provider evidence but do not yet post a compensating reversal journal. Refund/reversal ledgering and ambiguous-outcome reconciliation are the next financial-core items before treating the gateway as complete for unrestricted production money movement.
+Pixhub `transaction_refunded` events are persisted as provider evidence but do not yet post a compensating reversal journal. Refund/reversal ledgering remains the main financial-core item before treating the gateway as complete for unrestricted production money movement.
