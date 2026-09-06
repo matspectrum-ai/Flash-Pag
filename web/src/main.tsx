@@ -7,6 +7,7 @@ import { SessionProvider } from './app/session'
 import './styles/index.css'
 import './styles/responsive.css'
 import './styles/mobile.css'
+import './styles/saas.css'
 
 const queryClient = new QueryClient({
   defaultOptions: {
