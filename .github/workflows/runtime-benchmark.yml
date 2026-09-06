@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Probe exact Phase 3 Railway preview
+      - name: Probe final exact Phase 3 Railway preview
         shell: bash
         run: |
           set -euo pipefail
@@ -42,5 +42,5 @@ jobs:
             grep -q '"code":"preview_read_only"' "${label}-mutation.json"
           }
 
-          probe railway_exact https://flash-pag-phase3-dd630-preview-production.up.railway.app
+          probe railway_final https://flash-pag-phase3-final-preview-production.up.railway.app
           probe railway_stable https://flash-pag-react-preview-production.up.railway.app
