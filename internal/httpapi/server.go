@@ -99,7 +99,7 @@ func previewReadOnly(enabled bool, next http.Handler) http.Handler {
 	}
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/console/session" {
+		if r.URL.Path == "/console/session" && (r.Method == http.MethodPost || r.Method == http.MethodDelete) {
 			next.ServeHTTP(w, r)
 			return
 		}
