@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useQueries } from '@tanstack/react-query'
+import { useQueries, useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { Activity, BarChart3, Building2, CircleAlert, CircleDollarSign, ReceiptText, Store, TrendingUp } from 'lucide-react'
 import { api } from '../../api/client'
@@ -21,8 +21,15 @@ type MerchantRollup = {
 export function AdminFinancePage() {
   const { me } = useSession()
   const [days, setDays] = useState(30)
-  const merchants = me?.merchants ?? []
-  const organizations = me?.organizations ?? []
+  const platformAdmin = Boolean(me?.user.platform_admin)
+  const tenantsQuery = useQuery({
+    queryKey: ['platform-tenants'],
+    queryFn: api.adminTenants,
+    enabled: platformAdmin,
+    staleTime: 30_000,
+  })
+  const merchants = platformAdmin ? (tenantsQuery.data?.merchants ?? []) : (me?.merchants ?? [])
+  const organizations = platformAdmin ? (tenantsQuery.data?.organizations ?? []) : (me?.organizations ?? [])
 
   const transactionQueries = useQueries({
     queries: organizations.map((organization) => ({
@@ -73,12 +80,13 @@ export function AdminFinancePage() {
     [finance.transactions],
   )
   const maxDailyTPV = Math.max(1, ...finance.daily.map((point) => point.tpvMinor))
-  const isLoading = transactionQueries.some((query) => query.isLoading)
-  const hasError = transactionQueries.some((query) => query.isError)
+  const isLoading = tenantsQuery.isLoading || transactionQueries.some((query) => query.isLoading)
+  const hasError = tenantsQuery.isError || transactionQueries.some((query) => query.isError)
+  const inventoryIncomplete = tenantsQuery.data?.complete === false
   const dataLimited = transactionQueries.some((query) => (query.data?.data.length ?? 0) >= 1000)
   const activeMerchants = merchants.filter((merchant) => merchant.status === 'active').length
 
-  if (!me?.user.platform_admin) {
+  if (!platformAdmin) {
     return <div className="error-state"><CircleAlert size={22} /><strong>Acesso restrito à plataforma.</strong><span>O dashboard financeiro é exclusivo da administração Flash Pag.</span></div>
   }
 
@@ -95,8 +103,9 @@ export function AdminFinancePage() {
         </div>
       </section>
 
-      {hasError ? <div className="attention-banner"><div className="attention-icon"><CircleAlert size={17} /></div><div><strong>Leitura parcial</strong><span>Uma ou mais organizações não puderam ser carregadas. Os totais abaixo não devem ser tratados como fechamento.</span></div></div> : null}
-      {dataLimited ? <div className="attention-banner"><div className="attention-icon"><CircleAlert size={17} /></div><div><strong>Janela de dados limitada</strong><span>Ao menos uma organização atingiu o limite de 1.000 transações carregadas. O dashboard sinaliza a limitação em vez de presumir completude.</span></div></div> : null}
+      {hasError ? <div className="attention-banner"><div className="attention-icon"><CircleAlert size={17} /></div><div><strong>Leitura parcial</strong><span>Uma ou mais fontes administrativas não puderam ser carregadas. Os totais abaixo não devem ser tratados como fechamento.</span></div></div> : null}
+      {inventoryIncomplete ? <div className="attention-banner"><div className="attention-icon"><CircleAlert size={17} /></div><div><strong>Inventário global truncado</strong><span>O limite de segurança do inventário administrativo foi atingido. Métricas e ranking não devem ser tratados como visão global completa.</span></div></div> : null}
+      {dataLimited ? <div className="attention-banner"><div className="attention-icon"><CircleAlert size={17} /></div><div><strong>Janela de transações limitada</strong><span>Ao menos uma organização atingiu o limite de 1.000 transações carregadas. O dashboard sinaliza a limitação em vez de presumir completude.</span></div></div> : null}
 
       <section className="admin-finance-metrics">
         <article className="metric-card admin-metric-card"><div className="metric-label"><Activity size={16} /><span>TPV · Pix recebido</span></div><strong>{isLoading ? '…' : formatBRL(finance.metrics.tpvMinor)}</strong><span className="metric-detail">Volume `pix_in` concluído em {days} dias</span></article>
@@ -141,7 +150,7 @@ export function AdminFinancePage() {
         <div className="panel-header"><div><h2>Transações globais</h2><p>Somente Pix recebido. Transferências e saques não fazem parte desta fase.</p></div><span className="count-pill">{recentTransactions.length}</span></div>
         <div className="table-wrap">
           <table className="data-table admin-finance-table">
-            <thead><tr><th>Data</th><th>Merchant / organização</th><th>Status</th><th>TPV</th><th>Receita</th><th>Custo provider</th><th>Margem</th></tr></thead>
+            <thead><tr><th>Data</th><th>Merchant / organização</th><th>Status</th><th>Valor</th><th>Receita</th><th>Custo provider</th><th>Margem</th></tr></thead>
             <tbody>
               {recentTransactions.map(({ transaction, organization, merchant }) => {
                 const margin = transactionMarginMinor(transaction)
