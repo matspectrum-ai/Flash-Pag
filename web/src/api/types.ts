@@ -211,8 +211,8 @@ export type Transaction = {
   amount_minor: number
   fee_minor?: number
   provider_cost_minor?: number | null
-  pricing_version_id?: string | null
-  pricing_version?: number | null
+  pricing_version_id?: string
+  pricing_version?: number
   currency: string
   description?: string
   pix_key?: string
