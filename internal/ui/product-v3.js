@@ -94,23 +94,8 @@
 
     const form = $('#content form');
     if (form) {
-      const provider = form.querySelector('select[name="provider"]');
-      const amount = form.querySelector('input[name="amount_reais"]');
       const hint = form.querySelector('.form-hint');
-      const syncMinimum = () => {
-        const isPixhub = String(provider?.value || '').toLowerCase() === 'pixhub';
-        if (amount) {
-          amount.min = isPixhub ? '5' : '0.01';
-          amount.placeholder = isPixhub ? '5,00' : '0,00';
-        }
-        if (hint) {
-          hint.textContent = isPixhub
-            ? 'Pixhub: valor mínimo operacional de R$ 5,00. A saída só conclui quando o provider confirma; estados ambíguos permanecem reservados.'
-            : 'A saída só é concluída quando o provider confirma. Em caso ambíguo, o saldo permanece reservado para reconciliação.';
-        }
-      };
-      provider?.addEventListener('change', syncMinimum);
-      syncMinimum();
+      if (hint) hint.textContent = 'A saída só é concluída quando o provider confirma. Em caso ambíguo, o saldo permanece reservado para reconciliação. Limites mínimos podem variar por provider.';
     }
     normalizeRenderedView();
   };
