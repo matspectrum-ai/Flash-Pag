@@ -27,6 +27,13 @@ export type MeResponse = {
   installed_providers: string[]
 }
 
+export type OrganizationAccess = {
+  organization_id: string
+  role: 'owner' | 'admin' | 'member' | 'platform_admin' | string
+  can_manage: boolean
+  can_create_customer: boolean
+}
+
 export type Account = {
   id: string
   name: string
@@ -73,8 +80,17 @@ export type Customer = {
   name?: string
   email?: string
   document?: string
+  metadata?: Record<string, unknown>
   created_at?: string
   updated_at?: string
+}
+
+export type CustomerInput = {
+  external_id?: string
+  name?: string
+  email?: string
+  document?: string
+  metadata?: Record<string, unknown>
 }
 
 export type ProviderConnection = {
@@ -97,6 +113,15 @@ export type ApiKey = {
   created_at?: string
 }
 
+export type CreatedApiKey = ApiKey & {
+  secret: string
+}
+
+export type ApiKeyInput = {
+  name: string
+  scopes?: string[]
+}
+
 export type WebhookEndpoint = {
   id: string
   url: string
@@ -104,6 +129,16 @@ export type WebhookEndpoint = {
   events: string[]
   status: string
   created_at?: string
+}
+
+export type CreatedWebhookEndpoint = WebhookEndpoint & {
+  secret: string
+}
+
+export type WebhookInput = {
+  url: string
+  description?: string
+  events?: string[]
 }
 
 export type SummaryResponse = {
@@ -116,14 +151,15 @@ export type ListResponse<T> = {
   data: T[]
 }
 
-export type TransferInput = {
-  account_id?: string
-  amount_minor: number
-  currency: 'BRL'
-  pix_key: string
-  description?: string
-  provider?: string
-  provider_connection_id?: string
+export type AdminMerchantInput = {
+  name: string
+  owner_user_id?: string
+}
+
+export type AdminOrganizationInput = {
+  merchant_id: string
+  name: string
+  slug: string
 }
 
 export type ApiErrorShape = {
