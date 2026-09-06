@@ -33,6 +33,7 @@ export type Account = {
   currency: string
   status: string
   is_default: boolean
+  created_at?: string
 }
 
 export type Balance = {
@@ -42,6 +43,7 @@ export type Balance = {
   total_minor?: number
   available?: number
   reserved?: number
+  clearing?: number
   total?: number
 }
 
@@ -60,6 +62,45 @@ export type Transaction = {
   pix_key?: string
   created_at: string
   updated_at?: string
+}
+
+export type Customer = {
+  id: string
+  external_id?: string
+  name?: string
+  email?: string
+  document?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export type ProviderConnection = {
+  id: string
+  provider_code: string
+  label: string
+  config?: Record<string, unknown>
+  status: string
+  created_at?: string
+  updated_at?: string
+}
+
+export type ApiKey = {
+  id: string
+  name: string
+  prefix: string
+  scopes: string[]
+  last_used_at?: string | null
+  revoked_at?: string | null
+  created_at?: string
+}
+
+export type WebhookEndpoint = {
+  id: string
+  url: string
+  description?: string
+  events: string[]
+  status: string
+  created_at?: string
 }
 
 export type SummaryResponse = {
