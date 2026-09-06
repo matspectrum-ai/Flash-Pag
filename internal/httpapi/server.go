@@ -84,6 +84,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /console/api/withdrawals", s.withConsoleAuth(s.withKYCApprovedConsole(s.consoleCreateWithdrawal)))
 
 	// Platform administration.
+	s.mux.HandleFunc("GET /console/api/admin/tenants", s.withAdmin(s.adminTenantInventory))
+	s.mux.HandleFunc("GET /console/api/admin/merchants/{merchantID}/members", s.withAdmin(s.adminMerchantMembers))
 	s.mux.HandleFunc("GET /console/api/admin/kyc", s.withAdmin(s.adminKYCQueue))
 	s.mux.HandleFunc("GET /console/api/admin/kyc/{merchantID}", s.withAdmin(s.adminKYCDetail))
 	s.mux.HandleFunc("GET /console/api/admin/kyc/{merchantID}/documents/{id}", s.withAdmin(s.adminDownloadKYCDocument))
