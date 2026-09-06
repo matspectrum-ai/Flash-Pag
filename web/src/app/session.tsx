@@ -10,6 +10,7 @@ type SessionContextValue = {
   organization?: Organization
   organizationId?: string
   setOrganizationId: (id: string) => void
+  refreshMe: () => Promise<void>
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
 }
@@ -50,9 +51,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('flashpag.organization', id)
   }
 
+  const refreshMe = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['me'] })
+  }
+
   const login = async (email: string, password: string) => {
     await loginMutation.mutateAsync({ email, password })
-    await queryClient.invalidateQueries({ queryKey: ['me'] })
+    await refreshMe()
   }
 
   const logout = async () => {
@@ -73,6 +78,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       organization,
       organizationId: organization?.id,
       setOrganizationId,
+      refreshMe,
       login,
       logout,
     }),
