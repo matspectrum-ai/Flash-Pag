@@ -170,8 +170,10 @@ export const api = {
   adminTenants: () => request<AdminTenantInventory>('/console/api/admin/tenants'),
   adminMerchantMembers: (merchantId: string) =>
     request<AdminMerchantMembersResponse>(`/console/api/admin/merchants/${encodeURIComponent(merchantId)}/members`),
-  adminOrganizationCustomerCount: (organizationId: string) =>
-    request<{ count: number }>(`/console/api/admin/organizations/${encodeURIComponent(organizationId)}/customer-count`),
+  adminOrganizationStats: (organizationId: string) =>
+    request<{ accounts: number; customers: number; provider_connections: number }>(
+      `/console/api/admin/organizations/${encodeURIComponent(organizationId)}/stats`,
+    ),
   adminKYCQueue: () => request<ListResponse<PlatformKYCRow>>('/console/api/admin/kyc'),
   adminKYCDetail: (merchantId: string) => request<AdminKYCDetail>(`/console/api/admin/kyc/${encodeURIComponent(merchantId)}`),
   adminKYCStartReview: (merchantId: string, internalNote = '') =>
