@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -103,6 +104,50 @@ func (p *Provider) CheckConnection(ctx context.Context, conn provider.Connection
 		Provider: "pixhub", Healthy: true, Currency: "BRL",
 		AvailableMinor: available, BlockedMinor: blocked, ReserveMinor: reserve,
 	}, nil
+}
+
+func (p *Provider) Reconcile(ctx context.Context, conn provider.Connection, kind, externalID string) (provider.ReconcileResult, error) {
+	externalID = strings.TrimSpace(externalID)
+	if externalID == "" {
+		return provider.ReconcileResult{}, finalf("Pixhub reconciliation requires provider external id")
+	}
+	var path string
+	switch kind {
+	case "pix_in":
+		path = "/api/v1/pix/in/qrcode/" + url.PathEscape(externalID)
+	case "transfer", "withdrawal":
+		path = "/api/v1/pix/out/pixkey/" + url.PathEscape(externalID)
+	default:
+		return provider.ReconcileResult{}, finalf("Pixhub does not reconcile transaction kind %q", kind)
+	}
+	statusCode, raw, err := p.request(ctx, conn, http.MethodGet, path, nil, "")
+	if err != nil {
+		return provider.ReconcileResult{}, err
+	}
+	if statusCode < 200 || statusCode >= 300 {
+		return provider.ReconcileResult{}, classifyHTTP(statusCode, raw)
+	}
+	var out struct {
+		Success bool `json:"success"`
+		Data    struct {
+			ID     string `json:"id"`
+			Status string `json:"status"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return provider.ReconcileResult{}, fmt.Errorf("pixhub decode reconciliation response: %w", err)
+	}
+	if !out.Success || out.Data.ID == "" {
+		return provider.ReconcileResult{}, errors.New("pixhub returned an incomplete reconciliation response")
+	}
+	if out.Data.ID != externalID {
+		return provider.ReconcileResult{}, errors.New("pixhub reconciliation returned a different external id")
+	}
+	status := transferStatus(out.Data.Status)
+	if kind == "pix_in" {
+		status = chargeStatus(out.Data.Status)
+	}
+	return provider.ReconcileResult{ExternalID: out.Data.ID, Status: status, Raw: append(json.RawMessage(nil), raw...)}, nil
 }
 
 func (p *Provider) CreateCharge(ctx context.Context, conn provider.Connection, in provider.ChargeRequest) (provider.ChargeResult, error) {

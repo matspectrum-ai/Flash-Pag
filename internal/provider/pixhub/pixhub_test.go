@@ -260,3 +260,50 @@ func TestDecimalBRLToMinor(t *testing.T) {
 		}
 	}
 }
+
+func TestReconcileCharge(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/auth":
+			_, _ = w.Write([]byte(`{"success":true,"token":"jwt-test","expiresIn":60000}`))
+		case "/api/v1/pix/in/qrcode/trx_123":
+			if r.Method != http.MethodGet {
+				t.Fatalf("method = %s", r.Method)
+			}
+			_, _ = w.Write([]byte(`{"success":true,"data":{"id":"trx_123","status":"paid"}}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	p := NewWithClient(server.URL, server.Client())
+	result, err := p.Reconcile(context.Background(), testConn(t, nil), "pix_in", "trx_123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.ExternalID != "trx_123" || result.Status != "succeeded" {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestReconcileOutbound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/auth":
+			_, _ = w.Write([]byte(`{"success":true,"token":"jwt-test","expiresIn":60000}`))
+		case "/api/v1/pix/out/pixkey/transfer_123":
+			_, _ = w.Write([]byte(`{"success":true,"data":{"id":"transfer_123","status":"banking_processing"}}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	p := NewWithClient(server.URL, server.Client())
+	result, err := p.Reconcile(context.Background(), testConn(t, nil), "withdrawal", "transfer_123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != "pending" {
+		t.Fatalf("result = %#v", result)
+	}
+}
