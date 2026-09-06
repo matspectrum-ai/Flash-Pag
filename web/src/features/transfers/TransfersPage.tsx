@@ -33,6 +33,7 @@ function providerName(code: string) {
 export function TransfersPage() {
   const { organizationId } = useSession()
   const queryClient = useQueryClient()
+  const previewReadOnly = import.meta.env.VITE_PREVIEW_READ_ONLY === 'true'
   const [accountId, setAccountId] = useState('')
   const [amount, setAmount] = useState('')
   const [pixKey, setPixKey] = useState('')
@@ -269,9 +270,10 @@ export function TransfersPage() {
               <CircleAlert size={15} />
               <span>Confirme apenas uma vez. Estados ambíguos devem ser reconciliados, nunca reenviados.</span>
             </div>
+            {previewReadOnly ? <div className="inline-error">O preview é somente leitura. A confirmação está bloqueada no frontend e no backend.</div> : null}
             {mutation.isError ? <div className="inline-error">{mutation.error instanceof Error ? mutation.error.message : 'Não foi possível criar a transferência.'}</div> : null}
-            <button className="button button-primary button-full" type="button" disabled={mutation.isPending} onClick={() => mutation.mutate()}>
-              {mutation.isPending ? 'Enviando…' : 'Confirmar transferência'}
+            <button className="button button-primary button-full" type="button" disabled={mutation.isPending || previewReadOnly} onClick={() => mutation.mutate()}>
+              {previewReadOnly ? 'Bloqueado no preview' : mutation.isPending ? 'Enviando…' : 'Confirmar transferência'}
             </button>
             <button className="button button-quiet button-full" type="button" disabled={mutation.isPending} onClick={() => setReviewing(false)}>Editar dados</button>
           </section>
