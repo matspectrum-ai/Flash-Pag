@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from '../components/layout/AppShell'
 import { LoginPage } from '../features/auth/LoginPage'
+import { ConnectionsPage } from '../features/connections/ConnectionsPage'
 import { HomePage } from '../features/home/HomePage'
 import { useSession } from './session'
 
@@ -12,7 +13,6 @@ const labels: Record<string, string> = {
   'api-keys': 'API Keys',
   webhooks: 'Webhooks',
   docs: 'Documentação',
-  connections: 'Conexões',
   organization: 'Organização',
   platform: 'Plataforma',
 }
@@ -47,7 +47,7 @@ export function App() {
         <Route path="api-keys" element={<MigrationPlaceholder name="api-keys" />} />
         <Route path="webhooks" element={<MigrationPlaceholder name="webhooks" />} />
         <Route path="docs" element={<MigrationPlaceholder name="docs" />} />
-        <Route path="connections" element={<MigrationPlaceholder name="connections" />} />
+        <Route path="connections" element={<ConnectionsPage />} />
         <Route path="organization" element={<MigrationPlaceholder name="organization" />} />
         <Route path="platform" element={<MigrationPlaceholder name="platform" />} />
         <Route path="*" element={<Navigate to="/" replace />} />
