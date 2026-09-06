@@ -299,6 +299,18 @@ export type ListResponse<T> = {
   data: T[]
 }
 
+export type AdminTenantInventory = {
+  merchants: Merchant[]
+  organizations: Organization[]
+  merchants_complete: boolean
+  organizations_complete: boolean
+  complete: boolean
+}
+
+export type AdminMerchantMembersResponse = ListResponse<MerchantMember> & {
+  complete: boolean
+}
+
 export type AdminMerchantInput = {
   name: string
   owner_user_id?: string
