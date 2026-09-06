@@ -28,6 +28,7 @@ Preferred user-facing terms:
 - Conexões — PSP/provider connections used by the organization.
 - Organização — current company/tenant settings and access context.
 - Plataforma — Flash Pag operator area for platform administrators.
+- Taxas — platform-administered commercial pricing per Merchant.
 
 Avoid in merchant-facing UI unless technically necessary:
 
@@ -61,6 +62,7 @@ Avoid in merchant-facing UI unless technically necessary:
 6. Plataforma — platform administrators only
    - Administração
    - KYC
+   - Taxas
 
 The organization switcher lives in the application shell and changes the context for all organization-scoped views. Do not duplicate a technical `tenant` card next to it.
 
@@ -75,6 +77,7 @@ Platform administration is a distinct operating mode, not a merchant settings pa
 - Organizações;
 - Membros e permissões;
 - KYC/KYB review;
+- Taxas/pricing comercial por Merchant;
 - Conexões/providers oversight;
 - operational health.
 
@@ -126,7 +129,8 @@ Examples:
 - irreversible/destructive actions require confirmation;
 - secrets are shown once and never redisplayed in plaintext;
 - `mock` is development infrastructure and is never presented as an implicit production route;
-- real PSP operations require approved merchant verification.
+- real PSP operations require approved merchant verification;
+- pricing is frozen at transaction creation and never recalculated from a newer commercial policy.
 
 ## 5. Shell
 
@@ -186,6 +190,8 @@ Primary jobs:
 - copy technical references.
 
 Dense table first. Filters are compact. Details open without losing list context. CPF/CNPJ is masked by default and fully exposed only when the user's task requires it.
+
+Transaction detail must distinguish principal, Flash Pag fee and resulting net/total consequence. A failed operation must never make a configured fee look like recognized revenue.
 
 ### Transferências
 
@@ -386,7 +392,10 @@ Business components must include:
 - WebhookEndpointRow;
 - KYCStatus;
 - KYCDocument;
-- KYCReviewQueue.
+- KYCReviewQueue;
+- PricingRule;
+- PricingVersionHistory;
+- FeeSimulator.
 
 ## 12. Responsive behavior
 
@@ -461,9 +470,57 @@ The existing `/console/api/*` HTTP contracts may remain temporarily as private i
 
 ## 15. Commercial pricing boundary
 
-Merchant pricing is a platform-administered commercial rule, not a global fixed fee and not an organization setting by default.
+Commercial pricing belongs to the **Merchant** and is administered by Flash Pag platform administrators. It is not editable by the Merchant and it is not duplicated per organization by default.
 
-The pricing implementation belongs to the financial/pricing phase and must support versioned merchant-specific rules and immutable transaction-level pricing snapshots. Editing a merchant's current fee must never rewrite the economics of historical transactions.
+Supported operation classes are:
+
+- `pix_in` — Pix received;
+- `transfer` — outbound Pix transfer;
+- `withdrawal` — withdrawal.
+
+Each operation rule may combine:
+
+- fixed amount in integer centavos;
+- percentage in basis points;
+- optional minimum fee;
+- optional maximum fee.
+
+The effective fee is computed with integer-money semantics, then frozen into the transaction together with the pricing version and rule snapshot. Updating a Merchant's commercial condition creates a **new immutable pricing version**. It never rewrites an existing version and never changes historical transaction economics.
+
+Financial semantics:
+
+```text
+Pix in:
+  gross amount - Flash Pag fee = merchant net credit
+
+Transfer/withdrawal:
+  principal + Flash Pag fee = merchant total debit
+```
+
+Recognition rules:
+
+- Pix-in fee is recognized only when the incoming transaction succeeds;
+- outbound principal + fee are reserved together before provider execution;
+- successful outbound moves the principal to provider clearing and the fee to Flash Pag platform revenue;
+- definitively failed outbound releases both principal and fee back to available balance;
+- ambiguous outbound keeps principal + fee reserved until reconciliation;
+- configured fee on a failed transaction may remain in the immutable pricing snapshot for audit, but must not be displayed as recognized revenue.
+
+Ledger boundaries are explicit:
+
+- Merchant `available` / `reserved` remain internal Flash Pag balances;
+- `clearing` represents provider-facing principal movement;
+- `platform_revenue` represents Flash Pag merchant-fee revenue;
+- external PSP/provider balance is separate from every internal ledger bucket;
+- provider cost is separate from merchant pricing and is not netted into the merchant fee model.
+
+Future margin reporting is therefore derived as:
+
+```text
+Flash Pag merchant-fee revenue - provider cost = platform gross margin
+```
+
+The platform Taxas UI shows current version, all three operation rules, immutable history and a local fee simulator. Preview deployments remain read-only. Merchant transaction detail exposes the frozen effective fee and net/total consequence, while provider and pricing IDs remain technical-detail metadata.
 
 ## 16. Definition of done
 
