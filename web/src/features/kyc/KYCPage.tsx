@@ -128,8 +128,9 @@ export function KYCPage() {
 
   if (!organizationId) return <div className="empty-state"><strong>Selecione uma organização</strong><span>O KYC pertence ao Merchant da organização atual.</span></div>
   if (query.isLoading) return <div className="skeleton skeleton-panel" aria-busy="true" />
-  if (query.isError || !status) return <div className="error-state"><CircleAlert size={22} /><strong>Não foi possível carregar a verificação.</strong><span>{query.error instanceof Error ? query.error.message : 'Tente novamente.'}</span></div>
+  if (query.isError || !status || !query.data) return <div className="error-state"><CircleAlert size={22} /><strong>Não foi possível carregar a verificação.</strong><span>{query.error instanceof Error ? query.error.message : 'Tente novamente.'}</span></div>
 
+  const kycData = query.data
   const copy = statusCopy[status]
   const submissionError = submitMutation.error instanceof ApiError ? submitMutation.error : undefined
 
@@ -145,10 +146,10 @@ export function KYCPage() {
         {editable ? <div className="kyc-progress"><strong>{completion}%</strong><span>preenchido</span></div> : null}
       </section>
 
-      {query.data.profile.public_note ? (
+      {kycData.profile.public_note ? (
         <section className="kyc-observation">
           <CircleAlert size={19} />
-          <div><strong>Observação da análise</strong><p>{query.data.profile.public_note}</p></div>
+          <div><strong>Observação da análise</strong><p>{kycData.profile.public_note}</p></div>
         </section>
       ) : null}
 
