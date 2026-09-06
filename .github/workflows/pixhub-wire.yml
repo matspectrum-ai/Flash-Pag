@@ -1,0 +1,195 @@
+name: Wire Pixhub provider
+
+on:
+  push:
+    branches: [feat/minimal-pix-gateway]
+    paths: [.github/workflows/pixhub-wire.yml]
+
+permissions:
+  contents: write
+
+jobs:
+  wire:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/minimal-pix-gateway
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+      - name: Patch gateway wiring
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              if old not in text:
+                  raise SystemExit(f"marker not found in {path}: {old[:100]!r}")
+              p.write_text(text.replace(old, new, 1))
+
+          replace_once(
+              'internal/httpapi/business.go',
+              'type providerConnectionRow struct {',
+              '''type customerRow struct {
+          ID       string         `json:"id"`
+          Name     *string        `json:"name"`
+          Email    *string        `json:"email"`
+          Document *string        `json:"document"`
+          Metadata map[string]any `json:"metadata"`
+          }
+
+          type providerConnectionRow struct {'''
+          )
+
+          replace_once(
+              'internal/httpapi/business.go',
+              'func (s *Server) claimIdempotency(ctx context.Context, orgID, operation, key, fp, resourceID string) (idempotencyClaim, error) {',
+              '''func (s *Server) customerForOrg(ctx context.Context, orgID, customerID string) (customerRow, error) {
+          q := url.Values{"id": {"eq." + customerID}, "organization_id": {"eq." + orgID}, "select": {"id,name,email,document,metadata"}, "limit": {"1"}}
+          var rows []customerRow
+          if err := s.sb.Do(ctx, http.MethodGet, "/rest/v1/customers", q, nil, "", &rows); err != nil {
+              return customerRow{}, err
+          }
+          if len(rows) != 1 {
+              return customerRow{}, errors.New("customer not found")
+          }
+          return rows[0], nil
+          }
+
+          func stringValue(v *string) string {
+          if v == nil {
+              return ""
+          }
+          return *v
+          }
+
+          func (s *Server) providerCallbackURL(conn provider.Connection) string {
+          if conn.ID == "" || conn.ProviderCode == "" || s.cfg.PublicURL == "" {
+              return ""
+          }
+          callback := s.cfg.PublicURL + "/providers/" + conn.ProviderCode + "/webhooks/" + conn.ID
+          var secrets struct {
+              WebhookToken string `json:"webhook_token"`
+          }
+          if len(conn.Credentials) > 0 && json.Unmarshal(conn.Credentials, &secrets) == nil && secrets.WebhookToken != "" {
+              callback += "?token=" + url.QueryEscape(secrets.WebhookToken)
+          }
+          return callback
+          }
+
+          func (s *Server) claimIdempotency(ctx context.Context, orgID, operation, key, fp, resourceID string) (idempotencyClaim, error) {'''
+          )
+
+          replace_once(
+              'internal/httpapi/handlers_public.go',
+              '''\tconn, err := s.providerConnection(r.Context(), orgID, in.ProviderCode, in.ProviderConnectionID)
+          \tif err != nil {
+          \t\treturn transaction{}, false, 422, err
+          \t}
+          \tresourceID, err := id.UUID()''',
+              '''\tconn, err := s.providerConnection(r.Context(), orgID, in.ProviderCode, in.ProviderConnectionID)
+          \tif err != nil {
+          \t\treturn transaction{}, false, 422, err
+          \t}
+          \tvar customer any
+          \tvar providerCustomer *provider.Customer
+          \tif in.CustomerID != "" {
+          \t\tc, err := s.customerForOrg(r.Context(), orgID, in.CustomerID)
+          \t\tif err != nil {
+          \t\t\treturn transaction{}, false, 422, err
+          \t\t}
+          \t\tcustomer = in.CustomerID
+          \t\tproviderCustomer = &provider.Customer{Name: stringValue(c.Name), Email: stringValue(c.Email), Document: stringValue(c.Document)}
+          \t\tif c.Metadata != nil {
+          \t\t\tif phone, ok := c.Metadata["phone"].(string); ok {
+          \t\t\t\tproviderCustomer.Phone = phone
+          \t\t\t}
+          \t\t}
+          \t}
+          \tif in.ProviderCode == "pixhub" && providerCustomer == nil {
+          \t\treturn transaction{}, false, 422, errors.New("customer_id is required for Pixhub charges")
+          \t}
+          \tresourceID, err := id.UUID()'''
+          )
+
+          replace_once(
+              'internal/httpapi/handlers_public.go',
+              '''\tvar customer any = nil
+          \tif in.CustomerID != "" {
+          \t\tcustomer = in.CustomerID
+          \t}
+          \tvar connection any = nil''',
+              '''\tvar connection any = nil'''
+          )
+
+          replace_once(
+              'internal/httpapi/handlers_public.go',
+              'provider.ChargeRequest{OperationID: resourceID, AmountMinor: in.AmountMinor, Currency: in.Currency, Description: in.Description})',
+              'provider.ChargeRequest{OperationID: resourceID, AmountMinor: in.AmountMinor, Currency: in.Currency, Description: in.Description, Customer: providerCustomer, WebhookURL: s.providerCallbackURL(conn)})'
+          )
+
+          replace_once(
+              'internal/httpapi/handlers_public.go',
+              'provider.TransferRequest{OperationID: resourceID, AmountMinor: in.AmountMinor, Currency: in.Currency, PixKey: in.PixKey, Description: in.Description})',
+              'provider.TransferRequest{OperationID: resourceID, AmountMinor: in.AmountMinor, Currency: in.Currency, PixKey: in.PixKey, Description: in.Description, WebhookURL: s.providerCallbackURL(conn)})'
+          )
+
+          replace_once(
+              'internal/httpapi/handlers_console.go',
+              '''\tif in.Label == "" {
+          \t\tin.Label = "default"
+          \t}
+          \tvar cipher any = nil''',
+              '''\tif in.Label == "" {
+          \t\tin.Label = "default"
+          \t}
+          \tif in.ProviderCode == "pixhub" {
+          \t\tif in.Credentials == nil {
+          \t\t\tin.Credentials = map[string]any{}
+          \t\t}
+          \t\tclientID, _ := in.Credentials["client_id"].(string)
+          \t\tclientSecret, _ := in.Credentials["client_secret"].(string)
+          \t\tif strings.TrimSpace(clientID) == "" || strings.TrimSpace(clientSecret) == "" {
+          \t\t\twriteError(w, 422, "pixhub_credentials_required", "Pixhub requires client_id and client_secret")
+          \t\t\treturn
+          \t\t}
+          \t\tif token, _ := in.Credentials["webhook_token"].(string); token == "" {
+          \t\t\ttoken, err := id.Token(24)
+          \t\t\tif err != nil {
+          \t\t\t\twriteError(w, 500, "webhook_token_generation_failed", err.Error())
+          \t\t\t\treturn
+          \t\t\t}
+          \t\t\tin.Credentials["webhook_token"] = token
+          \t\t}
+          \t}
+          \tvar cipher any = nil'''
+          )
+
+          replace_once(
+              'internal/httpapi/provider_webhook.go',
+              '''\tevt, err := impl.VerifyWebhook(r.Context(), conn, map[string][]string(r.Header), body)''',
+              '''\theaders := map[string][]string(r.Header)
+          \tif token := r.URL.Query().Get("token"); token != "" {
+          \t\theaders["X-FlashPag-Webhook-Token"] = []string{token}
+          \t}
+          \tevt, err := impl.VerifyWebhook(r.Context(), conn, headers, body)'''
+          )
+          PY
+      - name: Format
+        run: gofmt -w ./cmd ./internal
+      - name: Test
+        run: go test ./...
+      - name: Vet
+        run: go vet ./...
+      - name: Commit wiring
+        run: |
+          git config user.name "flashpag-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git rm .github/workflows/pixhub-wire.yml
+          git add internal/httpapi internal/provider cmd
+          git commit -m "feat: wire Pixhub customer and authenticated callbacks"
+          git push origin HEAD:feat/minimal-pix-gateway
