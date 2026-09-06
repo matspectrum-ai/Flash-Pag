@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
   <title>Flash Pag</title>
   <link rel="stylesheet" href="/console/styles.css">
 </head>
@@ -10,37 +11,84 @@
   <main id="login" class="login hidden">
     <form id="login-form" class="login-card">
       <div class="brand-mark">F</div>
-      <h1>Flash Pag</h1>
-      <p>Gateway Pix</p>
-      <label>E-mail<input id="email" type="email" autocomplete="username" required></label>
-      <label>Senha<input id="password" type="password" autocomplete="current-password" required></label>
-      <button type="submit">Entrar</button>
+      <div class="login-copy">
+        <h1>Flash Pag</h1>
+        <p>Acesse sua operação Pix.</p>
+      </div>
+      <label><span>E-mail</span><input id="email" type="email" autocomplete="username" required></label>
+      <label><span>Senha</span><input id="password" type="password" autocomplete="current-password" required></label>
+      <button id="login-submit" type="submit" class="primary-action full">Entrar</button>
       <div id="login-error" class="error"></div>
     </form>
   </main>
 
   <div id="app" class="app hidden">
-    <aside>
-      <div class="brand"><div class="brand-mark small">F</div><div><strong>Flash Pag</strong><span>Pix Gateway</span></div></div>
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark small">F</div>
+        <div><strong>Flash Pag</strong><span>Pix Gateway</span></div>
+      </div>
+
       <nav>
-        <button data-view="dashboard" class="active">Dashboard</button>
-        <button data-view="transactions">Transações</button>
-        <button data-view="transfers">Transferências</button>
-        <button data-view="customers">Clientes</button>
-        <button data-view="integrations">Integrações</button>
-        <button data-view="webhooks">Webhooks</button>
-        <button data-view="accounts">Contas</button>
-        <button data-view="organizations">Organizações</button>
-        <button data-view="admin" id="admin-nav" class="hidden">Admin</button>
+        <div class="nav-group">
+          <span class="nav-label">Visão geral</span>
+          <button data-view="dashboard" class="active"><span class="nav-icon">⌂</span><span>Dashboard</span></button>
+        </div>
+        <div class="nav-group">
+          <span class="nav-label">Operação</span>
+          <button data-view="transactions"><span class="nav-icon">↕</span><span>Transações</span></button>
+          <button data-view="transfers"><span class="nav-icon">→</span><span>Transferências</span></button>
+          <button data-view="customers"><span class="nav-icon">○</span><span>Clientes</span></button>
+        </div>
+        <div class="nav-group">
+          <span class="nav-label">Desenvolvedores</span>
+          <button data-view="integrations"><span class="nav-icon">◇</span><span>Integrações</span></button>
+          <button data-view="webhooks"><span class="nav-icon">⌁</span><span>Webhooks</span></button>
+        </div>
+        <div class="nav-group">
+          <span class="nav-label">Estrutura</span>
+          <button data-view="accounts"><span class="nav-icon">▣</span><span>Contas</span></button>
+          <button data-view="organizations"><span class="nav-icon">◎</span><span>Organizações</span></button>
+        </div>
+        <div id="admin-nav-wrap" class="nav-group hidden">
+          <span class="nav-label">Plataforma</span>
+          <button data-view="admin" id="admin-nav"><span class="nav-icon">⚙</span><span>Administração</span></button>
+        </div>
       </nav>
-      <div class="aside-footer"><span id="user-email"></span><button id="logout" class="ghost">Sair</button></div>
+
+      <div class="aside-footer">
+        <div class="user-card">
+          <div class="avatar">M</div>
+          <div class="user-copy"><strong id="user-email"></strong><span id="user-role"></span></div>
+        </div>
+        <button id="logout" class="ghost">Sair</button>
+      </div>
     </aside>
+
     <section class="main">
-      <header><div><h1 id="page-title">Dashboard</h1><p id="page-subtitle">Visão operacional</p></div><select id="org-select"></select></header>
+      <header class="topbar">
+        <div class="page-heading">
+          <div class="eyebrow">Flash Pag <span class="dot">•</span> Beta</div>
+          <h1 id="page-title">Dashboard</h1>
+          <p id="page-subtitle">Visão operacional</p>
+        </div>
+        <div class="topbar-actions">
+          <label class="org-switcher"><span>Organização</span><select id="org-select"></select></label>
+        </div>
+      </header>
       <div id="flash" class="flash hidden"></div>
-      <div id="content"></div>
+      <div id="content" class="content"></div>
     </section>
   </div>
+
+  <div id="drawer-layer" class="drawer-layer hidden" aria-hidden="true">
+    <button id="drawer-backdrop" class="drawer-backdrop" aria-label="Fechar"></button>
+    <aside class="drawer" role="dialog" aria-modal="true">
+      <div class="drawer-head"><h2 id="drawer-title">Detalhes</h2><button id="drawer-close" class="icon-button" type="button" aria-label="Fechar">×</button></div>
+      <div id="drawer-content" class="drawer-content"></div>
+    </aside>
+  </div>
+
   <script src="/console/app.js"></script>
 </body>
 </html>
