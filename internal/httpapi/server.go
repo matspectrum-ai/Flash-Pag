@@ -29,7 +29,9 @@ func New(cfg config.Config, sb *supabase.Client, box *cryptobox.Box, providers *
 	s.routes()
 	return s
 }
-func (s *Server) Handler() http.Handler { return securityHeaders(previewReadOnly(s.cfg.PreviewReadOnly, s.mux)) }
+func (s *Server) Handler() http.Handler {
+	return securityHeaders(previewReadOnly(s.cfg.PreviewReadOnly, s.mux))
+}
 
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
