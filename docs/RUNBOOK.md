@@ -92,14 +92,32 @@ Read-only guards that must remain configured:
 
 The preview may read the shared beta backing data needed for validation because mutations are blocked at both backend middleware and UI layers. Do not remove either guard during normal validation.
 
+### Exact-head image fallback
+
+If the Railway connector reports the correct source branch but repeatedly redeploys an older cached source snapshot, do not move production and do not claim the branch head was validated.
+
+Use an isolated read-only Railway service built from a Docker image pinned to the exact Git SHA:
+1. Confirm CI is green for the target SHA.
+2. Build the repository at that exact SHA with Docker build argument `VITE_PREVIEW_READ_ONLY=true`.
+3. The image must contain code/static assets only. Never bake Supabase credentials, `APP_MASTER_KEY_B64`, provider credentials or any other runtime secret into the image.
+4. Deploy the image to a separate Railway preview service.
+5. Configure runtime secrets through Railway reference variables to the existing preview/shared values; do not copy secret plaintext into GitHub or build logs.
+6. Configure `APP_PREVIEW_READ_ONLY=true`, `APP_ADDR=:8080`, secure cookies and `/healthz`.
+7. Give the isolated service its own Railway preview domain on port 8080.
+8. Run the same health, SPA and HTTP 423 probes used for the canonical preview.
+9. Record the exact Git SHA, image identity and Railway deployment ID in project state/verification history.
+10. Treat temporary external image registries as validation transport only, not long-term production artifact storage.
+
+This fallback validates the exact code artifact without weakening production separation. It does not replace the requirement that the canonical preview configuration remain pointed at the Phase 3 branch.
+
 ## Preview promotion procedure
 
 1. Confirm the exact Phase 3 head SHA.
 2. Confirm CI is green for that SHA.
 3. Re-read `flash-pag` configuration and verify it still points at `feat/minimal-pix-gateway`.
-4. Confirm `flash-pag-react-preview` points at `feat/admin-finance-merchant-360`.
+4. Confirm `flash-pag-react-preview` remains configured for `feat/admin-finance-merchant-360`.
 5. Trigger/observe only the preview deployment.
-6. Confirm Railway deployment metadata reports the exact expected commit SHA and branch.
+6. Confirm Railway deployment metadata reports the exact expected commit SHA and branch. If the connector redeploys an older cached snapshot, stop treating the canonical service as exact-head evidence and use the isolated exact-image fallback above.
 7. Confirm build success, including TypeScript/Vite build and Go tests.
 8. Confirm `/healthz` succeeds and reports preview read-only mode.
 9. Confirm the React app loads through `/app/` and the Phase 3 routes return SPA content.
@@ -118,14 +136,17 @@ Authenticated acceptance checks:
 - Merchant membership remains readable when the Merchant has zero Organizations.
 - Organization stats use exact PostgREST counts for accounts, customers and provider connections; do not compare against generic bounded list lengths as proof of exactness.
 - Per-Organization transaction lists are capped at 1,000 rows for the beta client aggregation. If a list reaches the cap, Admin Financeiro/Merchant 360° must warn that financial totals may be incomplete.
+- Failed account, balance, provider-connection, membership, KYC, pricing or transaction reads must render as unavailable/partial rather than as real empty or zero state.
 
 ## Phase 3 visual/behavior checks
 
 Admin Financeiro:
 - Platform-admin only.
 - TPV uses successful `pix_in`; it is not Flash Pag revenue.
-- Revenue uses frozen `fee_minor`.
+- Revenue uses frozen `fee_minor` only after the Pix succeeds. Pending, failed or ambiguous rows must not display their frozen fee as realized revenue.
+- 7/30/90-day membership and daily chart buckets use the `America/Sao_Paulo` business calendar.
 - Provider cost shows only verified provider-specific cost evidence.
+- When provider-cost coverage is incomplete, a known subtotal must be visibly partial/confirmed and must not be presented as a complete zero-cost total.
 - Margin is absent/indisponível when provider-cost coverage is incomplete.
 - No metric is labeled net profit.
 - Transaction row amounts are labeled as values; TPV remains an aggregate concept.
@@ -138,11 +159,14 @@ Merchant 360°:
 - Zero, one and multiple Organization cases render safely.
 - KYC/KYB status and business details visible.
 - Current Pix pricing visible.
+- A missing Pix rule renders as unconfigured/unknown and is not mislabeled as an explicit “Sem mínimo”/“Sem máximo” rule.
 - Merchant members/roles visible independent of Organization existence.
 - Organization balance context and account details visible.
 - Exact account/customer/provider-connection counts visible by Organization.
 - Provider connection details visible by Organization.
+- Read failures are visibly unavailable/partial and are not confused with real empty lists.
 - Recent Pix activity consolidated across Organizations.
+- Row revenue follows the same successful-Pix realization rule as Admin Financeiro.
 
 Merchant panel guardrails:
 - Do not add Transferências navigation/page back into the merchant product UI.
