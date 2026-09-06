@@ -51,6 +51,7 @@ export type Transaction = {
   id: string
   account_id?: string
   customer_id?: string
+  provider_connection_id?: string | null
   provider_code?: string
   provider_external_id?: string | null
   kind: string
@@ -60,6 +61,8 @@ export type Transaction = {
   currency: string
   description?: string
   pix_key?: string
+  failure_code?: string | null
+  failure_message?: string | null
   created_at: string
   updated_at?: string
 }
@@ -111,6 +114,16 @@ export type SummaryResponse = {
 
 export type ListResponse<T> = {
   data: T[]
+}
+
+export type TransferInput = {
+  account_id?: string
+  amount_minor: number
+  currency: 'BRL'
+  pix_key: string
+  description?: string
+  provider?: string
+  provider_connection_id?: string
 }
 
 export type ApiErrorShape = {
