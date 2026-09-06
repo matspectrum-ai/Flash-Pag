@@ -105,11 +105,18 @@ export function Merchant360Page() {
   const pricingRules = (currentPricing?.rules ?? {}) as Record<string, PricingRule>
   const pixInRule = pricingRules.pix_in
   const members = (membersQuery.data?.data ?? []) as MerchantMember[]
-  const loading = tenantsQuery.isLoading || transactionQueries.some((query) => query.isLoading) || summaryQueries.some((query) => query.isLoading)
+  const financeLoading = tenantsQuery.isLoading || transactionQueries.some((query) => query.isLoading)
   const dataLimited = transactionQueries.some((query) => (query.data?.data.length ?? 0) >= 1000)
   const inventoryIncomplete = tenantsQuery.data?.complete === false
   const membersIncomplete = membersQuery.data?.complete === false
   const organizationStatsError = organizationStatsQueries.some((query) => query.isError)
+  const readError = transactionQueries.some((query) => query.isError)
+    || summaryQueries.some((query) => query.isError)
+    || accountQueries.some((query) => query.isError)
+    || connectionQueries.some((query) => query.isError)
+    || kycQuery.isError
+    || pricingQuery.isError
+    || membersQuery.isError
 
   if (!platformAdmin) {
     return <div className="error-state"><CircleAlert size={22} /><strong>Acesso restrito à plataforma.</strong><span>Merchant 360° é exclusivo da administração Flash Pag.</span></div>
@@ -135,34 +142,35 @@ export function Merchant360Page() {
       {dataLimited ? <div className="attention-banner"><div className="attention-icon"><CircleAlert size={17} /></div><div><strong>Janela de dados limitada</strong><span>Uma organização atingiu 1.000 transações carregadas. Os totais permanecem sinalizados como uma visão operacional, não fechamento contábil.</span></div></div> : null}
       {membersIncomplete ? <div className="attention-banner"><div className="attention-icon"><CircleAlert size={17} /></div><div><strong>Lista de membros truncada</strong><span>O limite de segurança de membros do tenant foi atingido; a equipe exibida não deve ser tratada como completa.</span></div></div> : null}
       {organizationStatsError ? <div className="attention-banner"><div className="attention-icon"><CircleAlert size={17} /></div><div><strong>Estatísticas operacionais parciais</strong><span>Ao menos uma organização não retornou suas contagens exatas. O restante do Merchant 360° permanece disponível.</span></div></div> : null}
+      {readError ? <div className="attention-banner"><div className="attention-icon"><CircleAlert size={17} /></div><div><strong>Leitura administrativa parcial</strong><span>Uma ou mais fontes do Merchant 360° falharam. Campos indisponíveis são sinalizados e não devem ser interpretados como valores vazios ou zero.</span></div></div> : null}
 
       <section className="admin-finance-metrics">
-        <article className="metric-card admin-metric-card"><div className="metric-label"><Activity size={16} /><span>TPV · Pix recebido</span></div><strong>{loading ? '…' : formatBRL(finance.metrics.tpvMinor)}</strong><span className="metric-detail">Volume concluído no período</span></article>
-        <article className="metric-card admin-metric-card"><div className="metric-label"><CircleDollarSign size={16} /><span>Receita Flash Pag</span></div><strong>{loading ? '…' : formatBRL(finance.metrics.revenueMinor)}</strong><span className="metric-detail">Taxas cobradas do merchant</span></article>
-        <article className="metric-card admin-metric-card"><div className="metric-label"><ReceiptText size={16} /><span>Custo provider confirmado</span></div><strong>{loading ? '…' : formatBRL(finance.metrics.providerCostMinor)}</strong><span className="metric-detail">{finance.metrics.providerCostComplete ? 'Cobertura completa' : `${finance.metrics.providerCostMissingCount} Pix sem custo explícito`}</span></article>
-        <article className="metric-card admin-metric-card"><div className="metric-label"><TrendingUp size={16} /><span>Margem</span></div><strong>{loading ? '…' : finance.metrics.marginMinor == null ? 'Indisponível' : formatBRL(finance.metrics.marginMinor)}</strong><span className="metric-detail">Receita − custo provider; não é lucro líquido</span></article>
+        <article className="metric-card admin-metric-card"><div className="metric-label"><Activity size={16} /><span>TPV · Pix recebido</span></div><strong>{financeLoading ? '…' : formatBRL(finance.metrics.tpvMinor)}</strong><span className="metric-detail">Volume concluído no período</span></article>
+        <article className="metric-card admin-metric-card"><div className="metric-label"><CircleDollarSign size={16} /><span>Receita Flash Pag</span></div><strong>{financeLoading ? '…' : formatBRL(finance.metrics.revenueMinor)}</strong><span className="metric-detail">Taxas cobradas do merchant</span></article>
+        <article className="metric-card admin-metric-card"><div className="metric-label"><ReceiptText size={16} /><span>Custo provider confirmado</span></div><strong>{financeLoading ? '…' : formatBRL(finance.metrics.providerCostMinor)}</strong><span className="metric-detail">{finance.metrics.providerCostComplete ? 'Cobertura completa' : `${finance.metrics.providerCostMissingCount} Pix sem custo explícito`}</span></article>
+        <article className="metric-card admin-metric-card"><div className="metric-label"><TrendingUp size={16} /><span>Margem</span></div><strong>{financeLoading ? '…' : finance.metrics.marginMinor == null ? 'Indisponível' : formatBRL(finance.metrics.marginMinor)}</strong><span className="metric-detail">Receita − custo provider; não é lucro líquido</span></article>
       </section>
 
       <section className="merchant-360-grid">
         <article className="panel merchant-360-info-card">
           <div className="panel-header"><div><h2>KYC / KYB</h2><p>Estado de verificação do merchant.</p></div><BadgeCheck size={18} /></div>
           <div className="merchant-360-detail-list">
-            <div><span>Status</span><strong>{kycQuery.data?.profile ? <StatusBadge status={kycQuery.data.profile.status} /> : '—'}</strong></div>
-            <div><span>Razão social</span><strong>{kycQuery.data?.profile?.legal_name || '—'}</strong></div>
-            <div><span>Nome fantasia</span><strong>{kycQuery.data?.profile?.trade_name || '—'}</strong></div>
-            <div><span>CNPJ / documento</span><strong>{kycQuery.data?.profile?.tax_id || '—'}</strong></div>
-            <div><span>E-mail</span><strong>{kycQuery.data?.profile?.company_email || '—'}</strong></div>
+            <div><span>Status</span><strong>{kycQuery.isError ? 'Indisponível' : kycQuery.data?.profile ? <StatusBadge status={kycQuery.data.profile.status} /> : '—'}</strong></div>
+            <div><span>Razão social</span><strong>{kycQuery.isError ? 'Indisponível' : kycQuery.data?.profile?.legal_name || '—'}</strong></div>
+            <div><span>Nome fantasia</span><strong>{kycQuery.isError ? 'Indisponível' : kycQuery.data?.profile?.trade_name || '—'}</strong></div>
+            <div><span>CNPJ / documento</span><strong>{kycQuery.isError ? 'Indisponível' : kycQuery.data?.profile?.tax_id || '—'}</strong></div>
+            <div><span>E-mail</span><strong>{kycQuery.isError ? 'Indisponível' : kycQuery.data?.profile?.company_email || '—'}</strong></div>
           </div>
         </article>
 
         <article className="panel merchant-360-info-card">
           <div className="panel-header"><div><h2>Pricing Pix</h2><p>Versão comercial atualmente aplicada ao Pix recebido.</p></div><CircleDollarSign size={18} /></div>
           <div className="merchant-360-detail-list">
-            <div><span>Versão</span><strong>{typeof currentPricing?.version === 'number' ? `v${currentPricing.version}` : '—'}</strong></div>
-            <div><span>Taxa fixa</span><strong>{pixInRule ? formatBRL(pixInRule.fixed_minor ?? 0) : '—'}</strong></div>
-            <div><span>Percentual</span><strong>{pixInRule ? `${((pixInRule.percent_bps ?? 0) / 100).toFixed(2)}%` : '—'}</strong></div>
-            <div><span>Mínimo</span><strong>{pixInRule?.min_fee_minor == null ? 'Sem mínimo' : formatBRL(pixInRule.min_fee_minor)}</strong></div>
-            <div><span>Máximo</span><strong>{pixInRule?.max_fee_minor == null ? 'Sem máximo' : formatBRL(pixInRule.max_fee_minor)}</strong></div>
+            <div><span>Versão</span><strong>{pricingQuery.isError ? 'Indisponível' : typeof currentPricing?.version === 'number' ? `v${currentPricing.version}` : '—'}</strong></div>
+            <div><span>Taxa fixa</span><strong>{pricingQuery.isError ? 'Indisponível' : pixInRule ? formatBRL(pixInRule.fixed_minor ?? 0) : '—'}</strong></div>
+            <div><span>Percentual</span><strong>{pricingQuery.isError ? 'Indisponível' : pixInRule ? `${((pixInRule.percent_bps ?? 0) / 100).toFixed(2)}%` : '—'}</strong></div>
+            <div><span>Mínimo</span><strong>{pricingQuery.isError ? 'Indisponível' : pixInRule ? (pixInRule.min_fee_minor == null ? 'Sem mínimo' : formatBRL(pixInRule.min_fee_minor)) : '—'}</strong></div>
+            <div><span>Máximo</span><strong>{pricingQuery.isError ? 'Indisponível' : pixInRule ? (pixInRule.max_fee_minor == null ? 'Sem máximo' : formatBRL(pixInRule.max_fee_minor)) : '—'}</strong></div>
           </div>
         </article>
       </section>
@@ -171,17 +179,26 @@ export function Merchant360Page() {
         <div className="panel-header"><div><h2>Organizações</h2><p>Saldos, contas, clientes, conexões e atividade Pix de cada contexto operacional.</p></div><span className="count-pill">{organizations.length}</span></div>
         <div className="merchant-360-org-grid">
           {organizations.map((organization, index) => {
-            const summary = summaryQueries[index]?.data
-            const accounts = accountQueries[index]?.data?.data ?? []
-            const stats = organizationStatsQueries[index]?.data
-            const connections = connectionQueries[index]?.data?.data ?? []
+            const transactionQuery = transactionQueries[index]
+            const summaryQuery = summaryQueries[index]
+            const accountQuery = accountQueries[index]
+            const statsQuery = organizationStatsQueries[index]
+            const connectionQuery = connectionQueries[index]
+            const summary = summaryQuery?.data
+            const accounts = accountQuery?.data?.data ?? []
+            const stats = statsQuery?.data
+            const connections = connectionQuery?.data?.data ?? []
             const organizationTx = finance.transactions.filter((item) => item.organization.id === organization.id)
             return <article className="merchant-360-org-card" key={organization.id}>
               <div className="merchant-360-org-head"><span className="platform-tenant-icon"><Building2 size={17} /></span><div><strong>{organization.name}</strong><code>{organization.slug}</code></div><StatusBadge status={organization.status} /></div>
-              <div className="merchant-360-org-balance"><span>Saldo disponível</span><strong>{summary ? formatBRL(balanceMinor(summary.balance as Record<string, unknown>, 'available')) : '—'}</strong><small>{summary ? `Reservado ${formatBRL(balanceMinor(summary.balance as Record<string, unknown>, 'reserved'))}` : 'Carregando saldo'}</small></div>
-              <div className="merchant-360-org-stats"><span><Landmark size={14} /><strong>{stats?.accounts ?? '—'}</strong><small>contas</small></span><span><Users size={14} /><strong>{stats?.customers ?? '—'}</strong><small>clientes</small></span><span><Network size={14} /><strong>{stats?.provider_connections ?? '—'}</strong><small>conexões</small></span><span><Activity size={14} /><strong>{organizationTx.filter((item) => item.transaction.status === 'succeeded').length}</strong><small>Pix no período</small></span></div>
-              {accounts.length ? <div className="merchant-360-connection-list">{accounts.slice(0, 3).map((account) => <span key={account.id}><strong>{account.name}</strong><small>{account.currency}</small><StatusBadge status={account.status} /></span>)}</div> : null}
-              <div className="merchant-360-connection-list">{connections.slice(0, 3).map((connection) => <span key={connection.id}><strong>{connection.provider_code}</strong><small>{connection.label}</small><StatusBadge status={connection.status} /></span>)}{!connections.length ? <em>Sem provider conectado.</em> : null}</div>
+              <div className="merchant-360-org-balance"><span>Saldo disponível</span><strong>{summaryQuery?.isError ? 'Indisponível' : summary ? formatBRL(balanceMinor(summary.balance as Record<string, unknown>, 'available')) : '—'}</strong><small>{summaryQuery?.isError ? 'Falha ao carregar saldo' : summary ? `Reservado ${formatBRL(balanceMinor(summary.balance as Record<string, unknown>, 'reserved'))}` : 'Carregando saldo'}</small></div>
+              <div className="merchant-360-org-stats"><span><Landmark size={14} /><strong>{statsQuery?.isError ? '—' : stats?.accounts ?? '—'}</strong><small>contas</small></span><span><Users size={14} /><strong>{statsQuery?.isError ? '—' : stats?.customers ?? '—'}</strong><small>clientes</small></span><span><Network size={14} /><strong>{statsQuery?.isError ? '—' : stats?.provider_connections ?? '—'}</strong><small>conexões</small></span><span><Activity size={14} /><strong>{transactionQuery?.isError ? '—' : organizationTx.filter((item) => item.transaction.status === 'succeeded').length}</strong><small>Pix no período</small></span></div>
+              <div className="merchant-360-connection-list">
+                {accountQuery?.isError ? <em>Contas indisponíveis.</em> : accountQuery?.isLoading ? <em>Carregando contas…</em> : accounts.length ? accounts.slice(0, 3).map((account) => <span key={account.id}><strong>{account.name}</strong><small>{account.currency}</small><StatusBadge status={account.status} /></span>) : <em>Sem contas cadastradas.</em>}
+              </div>
+              <div className="merchant-360-connection-list">
+                {connectionQuery?.isError ? <em>Conexões indisponíveis.</em> : connectionQuery?.isLoading ? <em>Carregando conexões…</em> : connections.length ? connections.slice(0, 3).map((connection) => <span key={connection.id}><strong>{connection.provider_code}</strong><small>{connection.label}</small><StatusBadge status={connection.status} /></span>) : <em>Sem provider conectado.</em>}
+              </div>
             </article>
           })}
           {!organizations.length ? <div className="empty-state compact-empty"><Building2 size={22} /><strong>Merchant sem organizações</strong><span>O Merchant 360° continua válido; não há contexto operacional por organização para exibir.</span></div> : null}
@@ -192,13 +209,14 @@ export function Merchant360Page() {
         <div className="panel-header"><div><h2>Equipe do merchant</h2><p>Membros e papéis do tenant, independente da existência de organizações.</p></div><span className="count-pill">{members.length}</span></div>
         <div className="merchant-360-members">
           {members.map((member) => <article key={member.user_id}><span className="customer-avatar"><Users size={14} /></span><div><strong>{member.email || member.user_id}</strong><span className="mono">{member.user_id}</span></div><span>{roleLabel(member.role)}</span></article>)}
-          {!members.length && !membersQuery.isLoading ? <div className="empty-state compact-empty"><Users size={22} /><strong>Sem membros carregados</strong><span>Nenhum vínculo de usuário foi retornado para este merchant.</span></div> : null}
+          {!members.length && membersQuery.isError ? <div className="empty-state compact-empty"><CircleAlert size={22} /><strong>Equipe indisponível</strong><span>Não foi possível carregar os vínculos de usuários deste merchant.</span></div> : null}
+          {!members.length && !membersQuery.isLoading && !membersQuery.isError ? <div className="empty-state compact-empty"><Users size={22} /><strong>Sem membros carregados</strong><span>Nenhum vínculo de usuário foi retornado para este merchant.</span></div> : null}
         </div>
       </section>
 
       <section className="panel">
         <div className="panel-header"><div><h2>Pix recentes</h2><p>Visão consolidada das organizações. Transferências e saques não aparecem aqui.</p></div><span className="count-pill">{recentTransactions.length}</span></div>
-        <div className="table-wrap"><table className="data-table admin-finance-table"><thead><tr><th>Data</th><th>Organização</th><th>Status</th><th>Valor</th><th>Receita</th><th>Custo provider</th><th>Margem</th></tr></thead><tbody>{recentTransactions.map(({ transaction, organization }) => { const margin = transactionMarginMinor(transaction); return <tr key={transaction.id}><td>{formatDateTime(transaction.created_at)}</td><td><strong>{organization.name}</strong><span>{transaction.provider_code || '—'}</span></td><td><StatusBadge status={transaction.status} /></td><td>{formatBRL(transaction.amount_minor)}</td><td>{formatBRL(transaction.fee_minor ?? 0)}</td><td>{typeof transaction.provider_cost_minor === 'number' ? formatBRL(transaction.provider_cost_minor) : '—'}</td><td>{margin == null ? '—' : formatBRL(margin)}</td></tr> })}</tbody></table></div>
+        <div className="table-wrap"><table className="data-table admin-finance-table"><thead><tr><th>Data</th><th>Organização</th><th>Status</th><th>Valor</th><th>Receita</th><th>Custo provider</th><th>Margem</th></tr></thead><tbody>{recentTransactions.map(({ transaction, organization }) => { const margin = transactionMarginMinor(transaction); return <tr key={transaction.id}><td>{formatDateTime(transaction.created_at)}</td><td><strong>{organization.name}</strong><span>{transaction.provider_code || '—'}</span></td><td><StatusBadge status={transaction.status} /></td><td>{formatBRL(transaction.amount_minor)}</td><td>{formatBRL(transaction.fee_minor ?? 0)}</td><td>{typeof transaction.provider_cost_minor === 'number' ? formatBRL(transaction.provider_cost_minor) : '—'}</td><td>{margin == null ? '—' : formatBRL(margin)}</td></tr> })}{!recentTransactions.length && !financeLoading ? <tr><td colSpan={7}><div className="empty-state compact-empty"><Activity size={22} /><strong>Nenhum Pix no período</strong><span>Não há Pix recebido para exibir nesta janela.</span></div></td></tr> : null}</tbody></table></div>
       </section>
     </div>
   )
