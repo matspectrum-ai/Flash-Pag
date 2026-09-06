@@ -39,3 +39,40 @@ func TestAppRouteFallsBackToSPAIndex(t *testing.T) {
 		t.Fatal("Content-Type is empty")
 	}
 }
+
+func TestPhase3AppRoutesFallBackToSPAIndex(t *testing.T) {
+	s := New(config.Config{}, nil, nil, provider.NewRegistry(), slog.Default())
+	paths := []string{
+		"/app/platform/finance",
+		"/app/platform/merchants/00000000-0000-0000-0000-000000000000",
+	}
+	for _, path := range paths {
+		t.Run(path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			rr := httptest.NewRecorder()
+			s.Handler().ServeHTTP(rr, req)
+			if rr.Code != http.StatusOK {
+				t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
+			}
+		})
+	}
+}
+
+func TestPhase3AdminReadRoutesRequireAuthentication(t *testing.T) {
+	s := New(config.Config{}, nil, nil, provider.NewRegistry(), slog.Default())
+	paths := []string{
+		"/console/api/admin/tenants",
+		"/console/api/admin/merchants/00000000-0000-0000-0000-000000000000/members",
+		"/console/api/admin/organizations/00000000-0000-0000-0000-000000000000/customer-count",
+	}
+	for _, path := range paths {
+		t.Run(path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			rr := httptest.NewRecorder()
+			s.Handler().ServeHTTP(rr, req)
+			if rr.Code != http.StatusUnauthorized {
+				t.Fatalf("status = %d, want %d", rr.Code, http.StatusUnauthorized)
+			}
+		})
+	}
+}
