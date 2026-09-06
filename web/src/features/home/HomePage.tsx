@@ -51,7 +51,7 @@ export function HomePage() {
   const summary = summaryQuery.data
   const transactions = transactionsQuery.data?.data ?? []
   const connections = connectionsQuery.data?.data ?? []
-  const activeConnections = connections.filter((item) => item.status === 'active')
+  const activeConnections = connections.filter((item) => item.status === 'active' && item.provider_code !== 'mock')
   const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
   const recent = transactions.filter((item) => new Date(item.created_at).getTime() >= cutoff)
   const succeeded = recent.filter((item) => item.status === 'succeeded')
@@ -113,7 +113,7 @@ export function HomePage() {
                   const incoming = transaction.direction === 'in' || transaction.kind === 'pix_in'
                   return (
                     <tr key={transaction.id}>
-                      <td><div className="transaction-primary"><span className={`direction-icon ${incoming ? 'incoming' : 'outgoing'}`}>{incoming ? <ArrowDownLeft size={15} /> : <ArrowUpRight size={15} />}</span><div><strong>{transactionLabel(transaction.kind)}</strong><span>{transaction.provider_code || 'Flash Pag'} · {transaction.id.slice(0, 8)}</span></div></div></td>
+                      <td><div className="transaction-primary"><span className={`direction-icon ${incoming ? 'incoming' : 'outgoing'}`}>{incoming ? <ArrowDownLeft size={15} /> : <ArrowUpRight size={15} />}</span><div><strong>{transactionLabel(transaction.kind)}</strong><span>{transaction.description || `ID ${transaction.id.slice(0, 10)}`}</span></div></div></td>
                       <td><StatusBadge status={transaction.status} /></td>
                       <td>{formatDateTime(transaction.created_at)}</td>
                       <td className={`align-right money ${incoming ? 'money-positive' : ''}`}>{incoming ? '+' : '-'} {formatBRL(transaction.amount_minor)}</td>
@@ -128,15 +128,15 @@ export function HomePage() {
 
         <aside className="panel connection-summary">
           <div className="panel-header">
-            <div><h2>Conexões</h2><p>Infraestrutura ativa para processar Pix.</p></div>
+            <div><h2>Rotas de pagamento</h2><p>Infraestrutura real elegível para processar Pix.</p></div>
             <Network size={18} />
           </div>
           <div className="connection-health-value"><strong>{activeConnections.length}</strong><span>ativa(s)</span></div>
           <div className="connection-list-mini">
             {activeConnections.slice(0, 3).map((connection) => (
-              <div key={connection.id}><div className="provider-avatar">{connection.provider_code.charAt(0).toUpperCase()}</div><div><strong>{connection.label}</strong><span>{connection.provider_code}</span></div><StatusBadge status={connection.status} /></div>
+              <div key={connection.id}><div className="provider-avatar">{connection.label.charAt(0).toUpperCase()}</div><div><strong>{connection.label}</strong><span>Conexão operacional</span></div><StatusBadge status={connection.status} /></div>
             ))}
-            {!activeConnections.length ? <div className="empty-inline">Nenhuma conexão ativa.</div> : null}
+            {!activeConnections.length ? <div className="empty-inline">Nenhuma conexão real ativa.</div> : null}
           </div>
           <Link to="/connections" className="button button-secondary button-full">Gerenciar conexões</Link>
         </aside>
