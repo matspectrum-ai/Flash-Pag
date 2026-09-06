@@ -3,6 +3,7 @@ package httpapi
 import (
 	"encoding/json"
 	"io"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -35,6 +36,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /docs", s.docs)
 	s.mux.HandleFunc("GET /openapi.yaml", s.openapi)
 
+	// Private application API. The /console prefix is retained during the React migration
+	// as an implementation detail and is not exposed as product terminology in the UI.
 	s.mux.HandleFunc("POST /console/session", s.login)
 	s.mux.HandleFunc("DELETE /console/session", s.logout)
 	s.mux.HandleFunc("GET /console/api/me", s.withConsoleAuth(s.consoleMe))
@@ -68,13 +71,41 @@ func (s *Server) routes() {
 
 	s.mux.HandleFunc("POST /providers/{provider}/webhooks/{connectionID}", s.providerWebhook)
 
-	fs := http.FileServer(http.FS(ui.Files))
-	s.mux.Handle("/console/", http.StripPrefix("/console/", fs))
+	legacy := http.FileServer(http.FS(ui.Files))
+	s.mux.Handle("/console/", http.StripPrefix("/console/", legacy))
 	s.mux.HandleFunc("GET /console", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/console/", http.StatusTemporaryRedirect)
 	})
+
+	if appRoot, err := fs.Sub(ui.AppFiles, "dist"); err == nil {
+		s.mux.Handle("/app/", http.StripPrefix("/app", spaFileServer(appRoot)))
+		s.mux.HandleFunc("GET /app", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/app/", http.StatusTemporaryRedirect)
+		})
+	}
+
 	s.mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
-		http.Redirect(w, r, "/docs", http.StatusTemporaryRedirect)
+		http.Redirect(w, r, "/app/", http.StatusTemporaryRedirect)
+	})
+}
+
+func spaFileServer(root fs.FS) http.Handler {
+	fileServer := http.FileServer(http.FS(root))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/")
+		if path == "" {
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+		if _, err := fs.Stat(root, path); err == nil {
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+		clone := r.Clone(r.Context())
+		urlCopy := *r.URL
+		urlCopy.Path = "/"
+		clone.URL = &urlCopy
+		fileServer.ServeHTTP(w, clone)
 	})
 }
 
@@ -97,8 +128,8 @@ func securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "no-referrer")
-		if strings.HasPrefix(r.URL.Path, "/console") {
-			w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'")
+		if strings.HasPrefix(r.URL.Path, "/console") || strings.HasPrefix(r.URL.Path, "/app") {
+			w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
 		}
 		next.ServeHTTP(w, r)
 	})
