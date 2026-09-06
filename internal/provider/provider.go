@@ -60,11 +60,26 @@ type WebhookEvent struct {
 	Raw         json.RawMessage `json:"raw,omitempty"`
 }
 
+type ConnectionStatus struct {
+	Provider       string `json:"provider"`
+	Healthy        bool   `json:"healthy"`
+	AvailableMinor int64  `json:"available_minor,omitempty"`
+	BlockedMinor   int64  `json:"blocked_minor,omitempty"`
+	ReserveMinor   int64  `json:"reserve_minor,omitempty"`
+	Currency       string `json:"currency,omitempty"`
+}
+
 type Provider interface {
 	Code() string
 	CreateCharge(context.Context, Connection, ChargeRequest) (ChargeResult, error)
 	CreateTransfer(context.Context, Connection, TransferRequest) (TransferResult, error)
 	VerifyWebhook(context.Context, Connection, map[string][]string, []byte) (WebhookEvent, error)
+}
+
+// ConnectionTester is optional. Providers implement it when they expose a read-only
+// authenticated endpoint suitable for validating credentials without moving money.
+type ConnectionTester interface {
+	CheckConnection(context.Context, Connection) (ConnectionStatus, error)
 }
 
 type FinalError struct{ Err error }
