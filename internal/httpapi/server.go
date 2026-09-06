@@ -86,7 +86,7 @@ func (s *Server) routes() {
 	// Platform administration.
 	s.mux.HandleFunc("GET /console/api/admin/tenants", s.withAdmin(s.adminTenantInventory))
 	s.mux.HandleFunc("GET /console/api/admin/merchants/{merchantID}/members", s.withAdmin(s.adminMerchantMembers))
-	s.mux.HandleFunc("GET /console/api/admin/organizations/{organizationID}/customer-count", s.withAdmin(s.adminOrganizationCustomerCount))
+	s.mux.HandleFunc("GET /console/api/admin/organizations/{organizationID}/stats", s.withAdmin(s.adminOrganizationStats))
 	s.mux.HandleFunc("GET /console/api/admin/kyc", s.withAdmin(s.adminKYCQueue))
 	s.mux.HandleFunc("GET /console/api/admin/kyc/{merchantID}", s.withAdmin(s.adminKYCDetail))
 	s.mux.HandleFunc("GET /console/api/admin/kyc/{merchantID}/documents/{id}", s.withAdmin(s.adminDownloadKYCDocument))
