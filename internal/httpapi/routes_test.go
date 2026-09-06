@@ -63,7 +63,7 @@ func TestPhase3AdminReadRoutesRequireAuthentication(t *testing.T) {
 	paths := []string{
 		"/console/api/admin/tenants",
 		"/console/api/admin/merchants/00000000-0000-0000-0000-000000000000/members",
-		"/console/api/admin/organizations/00000000-0000-0000-0000-000000000000/customer-count",
+		"/console/api/admin/organizations/00000000-0000-0000-0000-000000000000/stats",
 	}
 	for _, path := range paths {
 		t.Run(path, func(t *testing.T) {
