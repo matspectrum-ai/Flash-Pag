@@ -1,4 +1,6 @@
 FROM node:22-alpine AS web-build
+ARG VITE_PREVIEW_READ_ONLY=false
+ENV VITE_PREVIEW_READ_ONLY=$VITE_PREVIEW_READ_ONLY
 WORKDIR /src
 COPY web/package.json ./web/package.json
 COPY web/tsconfig.json web/vite.config.ts web/index.html ./web/
