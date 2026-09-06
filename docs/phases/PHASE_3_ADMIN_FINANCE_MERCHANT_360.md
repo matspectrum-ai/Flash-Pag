@@ -24,11 +24,11 @@ Required capabilities:
 Metric semantics are contractual:
 - TPV = successful `pix_in` amount processed in the selected period.
 - Flash Pag revenue = frozen transaction `fee_minor` charged by Flash Pag.
-- Provider cost = actual cost supported by explicit trustworthy provider evidence.
+- Provider cost = actual cost backed by a verified provider-specific contract.
 - Margin = revenue − provider cost only when provider-cost coverage is complete.
 - Net profit must not be displayed until all other relevant costs are modeled.
 
-When provider cost is unknown, it stays unknown; the UI must not substitute zero. The deterministic `mock` adapter is the only zero-cost exception currently treated as known.
+Unknown provider cost stays unknown. Do not infer it from plausible raw payload fields. The deterministic `mock` adapter is the only current zero-cost value treated as known. Pixhub currently has no verified cost contract in the repository, so Pixhub cost and Pixhub-inclusive margin remain unavailable by design.
 
 ### Merchant 360°
 
@@ -55,9 +55,9 @@ For a selected Merchant, the admin must be able to inspect:
 ## Current implementation recovered and reconciled from Git
 
 Backend/read-contract work:
-- `internal/httpapi/handlers_pricing.go` reads `provider_payload` only inside the server, removes it from responses, and attaches `provider_cost_minor` only for platform admins when explicit cost evidence is trustworthy.
-- `internal/httpapi/provider_cost.go` performs provider-cost extraction without guessing decimal/unit semantics.
-- `internal/httpapi/provider_cost_test.go` verifies known zero-cost mock behavior, explicit minor-unit cost fields and unknown-cost behavior.
+- `internal/httpapi/handlers_pricing.go` reads `provider_payload` only inside the server, removes it from responses, and attaches `provider_cost_minor` only for platform admins when the cost helper can prove the value is known.
+- `internal/httpapi/provider_cost.go` accepts only verified provider-specific semantics. In the current repository, `mock` is known zero-cost; live providers including Pixhub return unknown.
+- `internal/httpapi/provider_cost_test.go` verifies that plausible Pixhub fields such as `feeInCents`, `provider_fee_minor` or generic fee/cost keys are not treated as actual provider cost without a verified contract.
 - There is currently no dedicated admin-finance endpoint. Admin Financeiro and Merchant 360° aggregate existing organization-scoped contracts using platform-admin authorization. This preserves the Phase 3 no-migration/no-extra-read-model decision and is acceptable for the current beta while limits are visible.
 
 Frontend/API work:
@@ -69,12 +69,14 @@ Frontend/API work:
 - `web/src/features/platform/admin-finance.css` implements responsive Phase 3 layouts.
 - `web/src/app/App.tsx` registers `/platform/finance` and `/platform/merchants/:merchantId`.
 - `web/src/components/layout/AppShell.tsx` exposes Financeiro to platform admins on desktop/mobile and provides Merchant 360° route context.
+- `web/src/features/transactions/TransactionsPage.tsx` filters merchant-visible transaction rows to incoming Pix receipts; the Phase 3 work does not reintroduce Transferências through the merchant transaction surface.
 
 ## Implementation principles
 
 - Prefer aggregating existing organization-scoped contracts before introducing schema.
 - Platform admins may read organization-scoped APIs across tenants because authorization is enforced server-side.
 - Keep provider payload server-side; expose only sanitized derived cost evidence.
+- Never treat a field as provider cost merely because its name resembles `fee` or `cost`; the provider adapter/contract must define its semantics and integer-minor unit explicitly.
 - Keep financial calculation logic deterministic and isolated from presentation components.
 - If a transaction window is truncated by a read limit, surface that limitation rather than pretending totals are complete.
 - The current beta implementation fans out reads by Organization. Replace it with a purpose-built server-side read model only when measured merchant/organization scale or latency justifies that complexity.
@@ -113,7 +115,7 @@ Verification:
 
 ## Current CI evidence
 
-Implementation head `79f9c5073e03b600518021ceda380d53edfd3c5d` passed the full CI workflow: formatting check, TypeScript typecheck, Vite build, Go tests and Go vet. Documentation reconciliation after that SHA produces a newer final head, so exact-head CI must be green again before preview promotion.
+Implementation head `79f9c5073e03b600518021ceda380d53edfd3c5d` passed the full CI workflow: formatting check, TypeScript typecheck, Vite build, Go tests and Go vet. Provider-cost hardening and documentation updates after that SHA produce a newer final head, so exact-head CI must be green again before preview promotion.
 
 ## Definition of phase completion
 
