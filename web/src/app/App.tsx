@@ -14,6 +14,7 @@ import { KYCPage } from '../features/kyc/KYCPage'
 import { OrganizationPage } from '../features/organization/OrganizationPage'
 import { PlatformPage } from '../features/platform/PlatformPage'
 import { PlatformKYCPage } from '../features/platform/PlatformKYCPage'
+import { PlatformPricingPage } from '../features/platform/PlatformPricingPage'
 import { useSession } from './session'
 
 export function App() {
@@ -45,6 +46,7 @@ export function App() {
         <Route path="organization" element={<OrganizationPage />} />
         <Route path="platform" element={<PlatformPage />} />
         <Route path="platform/kyc" element={<PlatformKYCPage />} />
+        <Route path="platform/pricing" element={<PlatformPricingPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
