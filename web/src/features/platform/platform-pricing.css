@@ -1,0 +1,147 @@
+.pricing-page { min-width: 0; }
+
+.pricing-context {
+  min-height: 118px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  padding: 20px;
+  background: radial-gradient(circle at 90% -20%, rgba(116,103,255,.16), transparent 34%), var(--fp-surface);
+}
+.pricing-context > div:first-child { max-width: 720px; }
+.pricing-context h2 { margin: 5px 0 6px; font-size: 21px; letter-spacing: -.025em; }
+.pricing-context p { margin: 0; color: var(--fp-text-secondary); font-size: 11.5px; line-height: 1.55; }
+.pricing-merchant-select { min-width: 260px; display: grid; gap: 6px; }
+.pricing-merchant-select > span { color: var(--fp-text-tertiary); font-size: 9px; font-weight: 760; letter-spacing: .08em; text-transform: uppercase; }
+.pricing-merchant-select select,
+.pricing-simulator select {
+  height: 40px;
+  padding: 0 34px 0 12px;
+  border: 1px solid var(--fp-border-strong);
+  border-radius: 10px;
+  color: var(--fp-text);
+  background: var(--fp-input);
+  outline: none;
+}
+.pricing-merchant-select select:focus,
+.pricing-simulator select:focus { border-color: var(--fp-accent); box-shadow: 0 0 0 3px var(--fp-accent-soft); }
+
+.pricing-version-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  border: 1px solid var(--fp-border);
+  border-radius: 14px;
+  background: #0d0d10;
+  overflow: hidden;
+}
+.pricing-version-strip > div { min-height: 70px; display: grid; align-content: center; gap: 5px; padding: 14px 16px; border-right: 1px solid var(--fp-border); }
+.pricing-version-strip > div:last-child { border-right: 0; }
+.pricing-version-strip span { color: var(--fp-text-tertiary); font-size: 9.5px; }
+.pricing-version-strip strong { font-size: 12px; font-variant-numeric: tabular-nums; }
+
+.pricing-rule-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; }
+.pricing-rule-card { padding: 17px; }
+.pricing-rule-head { display: flex; align-items: flex-start; gap: 10px; }
+.pricing-rule-head > div:last-child { min-width: 0; display: grid; gap: 4px; }
+.pricing-rule-head strong { font-size: 12px; }
+.pricing-rule-head span { color: var(--fp-text-tertiary); font-size: 9.5px; line-height: 1.45; }
+.pricing-rule-icon { width: 31px; height: 31px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 9px; color: #b8b1ff; background: var(--fp-accent-soft); }
+.pricing-rule-value { margin-top: 24px; color: var(--fp-text); font-size: 17px; font-weight: 710; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+
+.pricing-workspace { display: grid; grid-template-columns: minmax(0,1.55fr) minmax(300px,.65fr); gap: 10px; align-items: start; }
+.pricing-editor { min-width: 0; }
+.pricing-editor-body { display: grid; gap: 14px; padding: 16px; }
+.pricing-rule-form {
+  margin: 0;
+  padding: 14px;
+  display: grid;
+  grid-template-columns: repeat(4,minmax(0,1fr));
+  gap: 10px;
+  border: 1px solid var(--fp-border);
+  border-radius: 12px;
+  background: #0d0d10;
+}
+.pricing-rule-form legend { padding: 0 7px; display: inline-flex; align-items: baseline; gap: 7px; }
+.pricing-rule-form legend strong { color: var(--fp-text); font-size: 11px; }
+.pricing-rule-form legend span { color: var(--fp-text-tertiary); font-size: 9px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.pricing-editor .field,
+.pricing-simulator .field { display: grid; gap: 6px; }
+.pricing-editor .field > span,
+.pricing-simulator .field > span { color: var(--fp-text-secondary); font-size: 9.5px; font-weight: 620; }
+.pricing-editor .field em { color: var(--fp-text-tertiary); font-size: 8.5px; font-style: normal; font-weight: 500; }
+.pricing-editor input,
+.pricing-simulator input,
+.pricing-note input {
+  width: 100%;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--fp-border-strong);
+  border-radius: 9px;
+  outline: none;
+  color: var(--fp-text);
+  background: var(--fp-input);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.pricing-editor input:focus,
+.pricing-simulator input:focus,
+.pricing-note input:focus { border-color: var(--fp-accent); box-shadow: 0 0 0 3px var(--fp-accent-soft); }
+.pricing-editor .input-prefix,
+.pricing-editor .input-suffix,
+.pricing-simulator .input-prefix { position: relative; display: flex; align-items: center; }
+.pricing-editor .input-prefix > span,
+.pricing-simulator .input-prefix > span { position: absolute; left: 10px; z-index: 1; color: var(--fp-text-tertiary); font-size: 9.5px; pointer-events: none; }
+.pricing-editor .input-prefix input,
+.pricing-simulator .input-prefix input { padding-left: 31px; }
+.pricing-editor .input-suffix > span { position: absolute; right: 10px; color: var(--fp-text-tertiary); font-size: 9.5px; pointer-events: none; }
+.pricing-editor .input-suffix input { padding-right: 28px; }
+.pricing-note { grid-column: 1 / -1; }
+.pricing-safety-note { display: flex; align-items: flex-start; gap: 9px; padding: 11px 12px; border: 1px solid rgba(116,103,255,.22); border-radius: 10px; color: #aba5d7; background: rgba(116,103,255,.065); font-size: 9.5px; line-height: 1.5; }
+.pricing-safety-note svg { flex: 0 0 auto; margin-top: 1px; color: #b8b1ff; }
+.pricing-editor-footer { min-height: 66px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; border-top: 1px solid var(--fp-border); background: #0e0e11; }
+.pricing-editor-footer > span { color: var(--fp-text-tertiary); font-size: 9.5px; }
+
+.pricing-side-stack { display: grid; gap: 10px; }
+.pricing-simulator .panel-header h2,
+.pricing-history .panel-header h2 { display: flex; align-items: center; gap: 6px; }
+.pricing-simulator-body { display: grid; gap: 12px; padding: 15px; }
+.pricing-simulation-result { margin: 2px 0 0; padding: 0; border-top: 1px solid var(--fp-border); }
+.pricing-simulation-result > div { min-height: 39px; display: flex; align-items: center; justify-content: space-between; gap: 14px; border-bottom: 1px solid #202026; }
+.pricing-simulation-result > div:last-child { border-bottom: 0; }
+.pricing-simulation-result dt { color: var(--fp-text-tertiary); font-size: 9.5px; }
+.pricing-simulation-result dd { margin: 0; color: var(--fp-text); font-size: 11px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.pricing-simulation-total dt,
+.pricing-simulation-total dd { color: var(--fp-success); }
+.pricing-simulation-total dd { font-size: 14px; }
+.pricing-history-list { max-height: 360px; overflow: auto; }
+.pricing-history-row { min-height: 59px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 14px; border-bottom: 1px solid #202026; }
+.pricing-history-row:last-child { border-bottom: 0; }
+.pricing-history-row.current { background: rgba(116,103,255,.055); }
+.pricing-history-row > div { min-width: 0; display: grid; gap: 3px; }
+.pricing-history-row strong { font-size: 10.5px; }
+.pricing-history-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fp-text-tertiary); font-size: 9px; }
+.pricing-history-row time { flex: 0 0 auto; color: var(--fp-text-tertiary); font-size: 8.5px; }
+.inline-success { padding: 10px 11px; border: 1px solid rgba(91,214,160,.22); border-radius: 9px; color: var(--fp-success); background: var(--fp-success-bg); font-size: 10px; }
+
+@media (max-width: 1120px) {
+  .pricing-rule-form { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .pricing-workspace { grid-template-columns: 1fr; }
+  .pricing-side-stack { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+
+@media (max-width: 760px) {
+  .pricing-context { align-items: stretch; flex-direction: column; gap: 16px; }
+  .pricing-merchant-select { min-width: 0; width: 100%; }
+  .pricing-version-strip { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .pricing-version-strip > div:nth-child(2) { border-right: 0; }
+  .pricing-version-strip > div:nth-child(-n+2) { border-bottom: 1px solid var(--fp-border); }
+  .pricing-rule-grid { grid-template-columns: 1fr; }
+  .pricing-side-stack { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 520px) {
+  .pricing-rule-form { grid-template-columns: 1fr; }
+  .pricing-editor-footer { align-items: stretch; flex-direction: column; }
+  .pricing-editor-footer .button { width: 100%; }
+}
