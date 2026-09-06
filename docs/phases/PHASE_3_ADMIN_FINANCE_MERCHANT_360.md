@@ -5,6 +5,7 @@ Status: IN PROGRESS.
 Development branch: `feat/admin-finance-merchant-360`.
 
 Recovered implementation baseline after timeout: `9f0cac522be4735f0a5028b8d49dba1a1f65ddef`.
+Validated implementation checkpoint: `d2578b2f26b9109696be66b6a56154666d2674a3`.
 
 ## Goal
 
@@ -105,18 +106,29 @@ Verification:
 - `go test ./...` green.
 - `go vet ./...` green.
 - TypeScript/Vite production build green.
-- CI green on the exact final branch head.
-- `flash-pag-react-preview` source switched to `feat/admin-finance-merchant-360` only after CI green.
-- Railway preview deployment built from the exact expected commit.
-- `/healthz` passes.
+- CI green on the exact branch head being reported.
+- `flash-pag-react-preview` source remains `feat/admin-finance-merchant-360`.
+- Railway preview deployment is built from the exact expected branch head.
+- `/healthz` passes and reports preview read-only mode.
 - `/app/`, `/app/platform/finance` and a Merchant 360° SPA route load.
-- Read-only preview protection is confirmed.
+- A safe mutation probe is rejected by preview middleware with HTTP 423 `preview_read_only`.
 - Railway production service `flash-pag` remains bound to `feat/minimal-pix-gateway` before and after validation.
 
-## Current CI evidence
+## Validated implementation checkpoint
 
-Implementation head `79f9c5073e03b600518021ceda380d53edfd3c5d` passed the full CI workflow: formatting check, TypeScript typecheck, Vite build, Go tests and Go vet. Provider-cost hardening and documentation updates after that SHA produce a newer final head, so exact-head CI must be green again before preview promotion.
+Commit `d2578b2f26b9109696be66b6a56154666d2674a3` passed the full GitHub CI workflow: formatting check, TypeScript typecheck, Vite build, Go tests and Go vet.
+
+Railway preview deployment `b96fc6dc-be7b-4660-ba4e-166e858593a6` deployed that exact commit from `feat/admin-finance-merchant-360` and completed successfully. Runtime validation produced:
+- `GET /healthz` → HTTP 200, `{"ok":true,"preview_read_only":true}`.
+- `POST /console/register` with harmless `{}` → HTTP 423, code `preview_read_only`; no registration handler mutation executed.
+- `GET /app/` → HTTP 200 with React root and bundled assets.
+- `GET /app/platform/finance` → HTTP 200 with the same SPA fallback.
+- `GET /app/platform/merchants/00000000-0000-0000-0000-000000000000` → HTTP 200 with the same SPA fallback.
+
+Production `flash-pag` remained on `feat/minimal-pix-gateway` throughout the checkpoint.
+
+Phase 3 intentionally remains IN PROGRESS after this technical checkpoint. Authenticated visual/product acceptance and any further agreed Phase 3 refinements should be completed before changing status to COMPLETE.
 
 ## Definition of phase completion
 
-Phase 3 may move from IN PROGRESS to COMPLETE only when all acceptance criteria above are verified and the permanent documentation (`PROJECT_STATE`, `ROADMAP`, `DECISIONS`, this phase document, and relevant RUNBOOK instructions) is updated to match the validated final state.
+Phase 3 may move from IN PROGRESS to COMPLETE only when all acceptance criteria above are verified for the final intended head, product acceptance is complete, and the permanent documentation (`PROJECT_STATE`, `ROADMAP`, `DECISIONS`, this phase document, and relevant RUNBOOK instructions) matches the validated final state.
