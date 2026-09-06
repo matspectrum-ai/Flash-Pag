@@ -3,7 +3,7 @@ import { useQueries, useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 import { Activity, ArrowLeft, BadgeCheck, Building2, CircleAlert, CircleDollarSign, Landmark, Network, ReceiptText, Store, TrendingUp, Users } from 'lucide-react'
 import { api } from '../../api/client'
-import type { Account, Customer, MerchantMember, ProviderConnection } from '../../api/types'
+import type { Account, MerchantMember, ProviderConnection } from '../../api/types'
 import { useSession } from '../../app/session'
 import { balanceMinor, formatBRL, formatDateTime, roleLabel } from '../../lib/format'
 import { StatusBadge } from '../../components/ui/StatusBadge'
@@ -54,11 +54,11 @@ export function Merchant360Page() {
       staleTime: 15_000,
     })),
   })
-  const customerQueries = useQueries({
+  const customerCountQueries = useQueries({
     queries: organizations.map((organization) => ({
-      queryKey: ['merchant-360-customers', organization.id],
-      queryFn: () => api.list<Customer>('customers', organization.id),
-      staleTime: 15_000,
+      queryKey: ['merchant-360-customer-count', organization.id],
+      queryFn: () => api.adminOrganizationCustomerCount(organization.id),
+      staleTime: 30_000,
     })),
   })
   const connectionQueries = useQueries({
@@ -109,6 +109,7 @@ export function Merchant360Page() {
   const dataLimited = transactionQueries.some((query) => (query.data?.data.length ?? 0) >= 1000)
   const inventoryIncomplete = tenantsQuery.data?.complete === false
   const membersIncomplete = membersQuery.data?.complete === false
+  const customerCountError = customerCountQueries.some((query) => query.isError)
 
   if (!platformAdmin) {
     return <div className="error-state"><CircleAlert size={22} /><strong>Acesso restrito à plataforma.</strong><span>Merchant 360° é exclusivo da administração Flash Pag.</span></div>
@@ -133,6 +134,7 @@ export function Merchant360Page() {
       {inventoryIncomplete ? <div className="attention-banner"><div className="attention-icon"><CircleAlert size={17} /></div><div><strong>Inventário administrativo truncado</strong><span>O merchant atual foi encontrado, mas a plataforma atingiu o limite global de segurança. Totais comparativos externos a este tenant podem estar incompletos.</span></div></div> : null}
       {dataLimited ? <div className="attention-banner"><div className="attention-icon"><CircleAlert size={17} /></div><div><strong>Janela de dados limitada</strong><span>Uma organização atingiu 1.000 transações carregadas. Os totais permanecem sinalizados como uma visão operacional, não fechamento contábil.</span></div></div> : null}
       {membersIncomplete ? <div className="attention-banner"><div className="attention-icon"><CircleAlert size={17} /></div><div><strong>Lista de membros truncada</strong><span>O limite de segurança de membros do tenant foi atingido; a equipe exibida não deve ser tratada como completa.</span></div></div> : null}
+      {customerCountError ? <div className="attention-banner"><div className="attention-icon"><CircleAlert size={17} /></div><div><strong>Contagem de clientes parcial</strong><span>Ao menos uma organização não retornou a contagem exata de clientes. O restante do Merchant 360° permanece disponível.</span></div></div> : null}
 
       <section className="admin-finance-metrics">
         <article className="metric-card admin-metric-card"><div className="metric-label"><Activity size={16} /><span>TPV · Pix recebido</span></div><strong>{loading ? '…' : formatBRL(finance.metrics.tpvMinor)}</strong><span className="metric-detail">Volume concluído no período</span></article>
@@ -171,13 +173,13 @@ export function Merchant360Page() {
           {organizations.map((organization, index) => {
             const summary = summaryQueries[index]?.data
             const accounts = accountQueries[index]?.data?.data ?? []
-            const customers = customerQueries[index]?.data?.data ?? []
+            const customerCount = customerCountQueries[index]?.data?.count
             const connections = connectionQueries[index]?.data?.data ?? []
             const organizationTx = finance.transactions.filter((item) => item.organization.id === organization.id)
             return <article className="merchant-360-org-card" key={organization.id}>
               <div className="merchant-360-org-head"><span className="platform-tenant-icon"><Building2 size={17} /></span><div><strong>{organization.name}</strong><code>{organization.slug}</code></div><StatusBadge status={organization.status} /></div>
               <div className="merchant-360-org-balance"><span>Saldo disponível</span><strong>{summary ? formatBRL(balanceMinor(summary.balance as Record<string, unknown>, 'available')) : '—'}</strong><small>{summary ? `Reservado ${formatBRL(balanceMinor(summary.balance as Record<string, unknown>, 'reserved'))}` : 'Carregando saldo'}</small></div>
-              <div className="merchant-360-org-stats"><span><Landmark size={14} /><strong>{accounts.length}</strong><small>contas</small></span><span><Users size={14} /><strong>{customers.length}{customers.length >= 100 ? '+' : ''}</strong><small>clientes</small></span><span><Network size={14} /><strong>{connections.length}</strong><small>conexões</small></span><span><Activity size={14} /><strong>{organizationTx.filter((item) => item.transaction.status === 'succeeded').length}</strong><small>Pix no período</small></span></div>
+              <div className="merchant-360-org-stats"><span><Landmark size={14} /><strong>{accounts.length}</strong><small>contas</small></span><span><Users size={14} /><strong>{typeof customerCount === 'number' ? customerCount : '—'}</strong><small>clientes</small></span><span><Network size={14} /><strong>{connections.length}</strong><small>conexões</small></span><span><Activity size={14} /><strong>{organizationTx.filter((item) => item.transaction.status === 'succeeded').length}</strong><small>Pix no período</small></span></div>
               <div className="merchant-360-connection-list">{connections.slice(0, 3).map((connection) => <span key={connection.id}><strong>{connection.provider_code}</strong><small>{connection.label}</small><StatusBadge status={connection.status} /></span>)}{!connections.length ? <em>Sem provider conectado.</em> : null}</div>
             </article>
           })}
