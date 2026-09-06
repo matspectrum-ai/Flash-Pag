@@ -25,6 +25,7 @@ function providerName(code: string) {
 
 export function ConnectionsPage() {
   const { organizationId } = useSession()
+  const previewReadOnly = import.meta.env.VITE_PREVIEW_READ_ONLY === 'true'
   const [healthByConnection, setHealthByConnection] = useState<Record<string, ConnectionHealth>>({})
 
   const connectionsQuery = useQuery({
@@ -84,16 +85,16 @@ export function ConnectionsPage() {
                   <div className="health-copy">
                     {health ? (health.healthy ? <CheckCircle2 size={17} /> : <CircleAlert size={17} />) : <RefreshCw size={17} />}
                     <div>
-                      <strong>{health ? (health.healthy ? 'Conexão saudável' : 'Atenção necessária') : 'Saúde não consultada'}</strong>
-                      <span>{health?.currency ? `${health.currency} · leitura externa` : 'O teste é somente leitura e não movimenta dinheiro.'}</span>
+                      <strong>{health ? (health.healthy ? 'Conexão saudável' : 'Atenção necessária') : previewReadOnly ? 'Consulta desabilitada no preview' : 'Saúde não consultada'}</strong>
+                      <span>{health?.currency ? `${health.currency} · leitura externa` : previewReadOnly ? 'O preview não executa chamadas POST, mesmo quando a operação é somente leitura.' : 'O teste é somente leitura e não movimenta dinheiro.'}</span>
                     </div>
                   </div>
                   {typeof health?.available_minor === 'number' ? <div className="external-balance"><span>Saldo externo</span><strong>{formatBRL(health.available_minor)}</strong></div> : null}
                 </div>
 
-                <button className="button button-secondary button-full" disabled={testing} onClick={() => testMutation.mutate(connection.id)}>
+                <button className="button button-secondary button-full" disabled={testing || previewReadOnly} onClick={() => testMutation.mutate(connection.id)}>
                   <RefreshCw size={15} className={testing ? 'spin' : ''} />
-                  {testing ? 'Testando…' : 'Testar conexão'}
+                  {previewReadOnly ? 'Indisponível no preview' : testing ? 'Testando…' : 'Testar conexão'}
                 </button>
               </article>
             )
