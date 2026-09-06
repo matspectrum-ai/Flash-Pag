@@ -1,5 +1,14 @@
 import type { Merchant, Organization, Transaction } from '../../api/types'
 
+export const FINANCE_TIME_ZONE = 'America/Sao_Paulo'
+
+const financeDateFormatter = new Intl.DateTimeFormat('en-US', {
+  timeZone: FINANCE_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
+
 export type ScopedTransaction = {
   transaction: Transaction
   organization: Organization
@@ -28,24 +37,41 @@ export type AdminFinanceDailyPoint = {
   count: number
 }
 
-export function periodCutoff(days: number) {
-  const cutoff = new Date()
-  cutoff.setHours(0, 0, 0, 0)
-  cutoff.setDate(cutoff.getDate() - days + 1)
-  return cutoff
+export function financeDateKey(date: Date) {
+  if (!Number.isFinite(date.getTime())) return null
+  const parts = financeDateFormatter.formatToParts(date)
+  const year = parts.find((part) => part.type === 'year')?.value
+  const month = parts.find((part) => part.type === 'month')?.value
+  const day = parts.find((part) => part.type === 'day')?.value
+  return year && month && day ? `${year}-${month}-${day}` : null
 }
 
-export function filterPixInForPeriod(items: ScopedTransaction[], days: number) {
-  const cutoff = periodCutoff(days).getTime()
+export function periodDateKeys(days: number, now = new Date()) {
+  if (!Number.isInteger(days) || days < 1) return []
+  const todayKey = financeDateKey(now)
+  if (!todayKey) return []
+  const [year, month, day] = todayKey.split('-').map(Number)
+  const anchor = new Date(Date.UTC(year, month - 1, day, 12))
+  const keys: string[] = []
+  for (let offset = days - 1; offset >= 0; offset -= 1) {
+    const cursor = new Date(anchor)
+    cursor.setUTCDate(anchor.getUTCDate() - offset)
+    keys.push(cursor.toISOString().slice(0, 10))
+  }
+  return keys
+}
+
+export function filterPixInForPeriod(items: ScopedTransaction[], days: number, now = new Date()) {
+  const acceptedDates = new Set(periodDateKeys(days, now))
   return items.filter(({ transaction }) => {
     if (transaction.kind !== 'pix_in') return false
-    const created = new Date(transaction.created_at).getTime()
-    return Number.isFinite(created) && created >= cutoff
+    const key = financeDateKey(new Date(transaction.created_at))
+    return key != null && acceptedDates.has(key)
   })
 }
 
-export function aggregateFinance(items: ScopedTransaction[], days: number) {
-  const filtered = filterPixInForPeriod(items, days)
+export function aggregateFinance(items: ScopedTransaction[], days: number, now = new Date()) {
+  const filtered = filterPixInForPeriod(items, days, now)
   const metrics: AdminFinanceMetrics = {
     tpvMinor: 0,
     revenueMinor: 0,
@@ -62,12 +88,8 @@ export function aggregateFinance(items: ScopedTransaction[], days: number) {
   }
 
   const daily = new Map<string, AdminFinanceDailyPoint>()
-  for (let i = days - 1; i >= 0; i -= 1) {
-    const date = new Date()
-    date.setHours(0, 0, 0, 0)
-    date.setDate(date.getDate() - i)
-    const key = date.toISOString().slice(0, 10)
-    daily.set(key, { date: key, tpvMinor: 0, revenueMinor: 0, count: 0 })
+  for (const date of periodDateKeys(days, now)) {
+    daily.set(date, { date, tpvMinor: 0, revenueMinor: 0, count: 0 })
   }
 
   for (const { transaction } of filtered) {
@@ -83,8 +105,8 @@ export function aggregateFinance(items: ScopedTransaction[], days: number) {
           metrics.providerCostComplete = false
           metrics.providerCostMissingCount += 1
         }
-        const key = new Date(transaction.created_at).toISOString().slice(0, 10)
-        const point = daily.get(key)
+        const key = financeDateKey(new Date(transaction.created_at))
+        const point = key ? daily.get(key) : undefined
         if (point) {
           point.tpvMinor += transaction.amount_minor
           point.revenueMinor += transaction.fee_minor ?? 0
