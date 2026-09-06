@@ -1,0 +1,80 @@
+export type Merchant = {
+  id: string
+  name: string
+  status: string
+  created_at?: string
+}
+
+export type Organization = {
+  id: string
+  merchant_id: string
+  name: string
+  slug: string
+  status: string
+  created_at?: string
+}
+
+export type CurrentUser = {
+  id: string
+  email: string
+  platform_admin: boolean
+}
+
+export type MeResponse = {
+  user: CurrentUser
+  merchants: Merchant[]
+  organizations: Organization[]
+  installed_providers: string[]
+}
+
+export type Account = {
+  id: string
+  name: string
+  currency: string
+  status: string
+  is_default: boolean
+}
+
+export type Balance = {
+  available_minor?: number
+  reserved_minor?: number
+  clearing_minor?: number
+  total_minor?: number
+  available?: number
+  reserved?: number
+  total?: number
+}
+
+export type Transaction = {
+  id: string
+  account_id?: string
+  customer_id?: string
+  provider_code?: string
+  provider_external_id?: string | null
+  kind: string
+  direction?: string
+  status: string
+  amount_minor: number
+  currency: string
+  description?: string
+  pix_key?: string
+  created_at: string
+  updated_at?: string
+}
+
+export type SummaryResponse = {
+  account: Account
+  balance: Balance
+  recent_transactions: Transaction[]
+}
+
+export type ListResponse<T> = {
+  data: T[]
+}
+
+export type ApiErrorShape = {
+  error?: {
+    code?: string
+    message?: string
+  }
+}
