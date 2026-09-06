@@ -1,81 +1,21 @@
 package httpapi
 
-import (
-	"bytes"
-	"encoding/json"
-	"strconv"
-	"strings"
-)
+import "encoding/json"
 
-func providerCostMinor(providerCode string, payload json.RawMessage) (int64, bool) {
-	if providerCode == "mock" {
+// providerCostMinor returns the actual provider cost only when Flash Pag has a
+// verified provider-specific contract for that value. Never infer cost from
+// generic fields in raw provider payloads: a plausible-looking `fee` can refer
+// to a customer charge, tax, settlement adjustment, or another unit entirely.
+func providerCostMinor(providerCode string, _ json.RawMessage) (int64, bool) {
+	switch providerCode {
+	case "mock":
+		// The deterministic development adapter never moves real money and has no
+		// external processing cost by definition.
 		return 0, true
-	}
-
-	trimmed := bytes.TrimSpace(payload)
-	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
-		return 0, false
-	}
-
-	decoder := json.NewDecoder(bytes.NewReader(trimmed))
-	decoder.UseNumber()
-	var value any
-	if err := decoder.Decode(&value); err != nil {
-		return 0, false
-	}
-
-	return findProviderCostMinor(value)
-}
-
-func findProviderCostMinor(value any) (int64, bool) {
-	switch typed := value.(type) {
-	case map[string]any:
-		for key, item := range typed {
-			if !providerCostKey(key) {
-				continue
-			}
-			if cost, ok := exactMinorInteger(item); ok && cost >= 0 {
-				return cost, true
-			}
-		}
-		for _, item := range typed {
-			if cost, ok := findProviderCostMinor(item); ok {
-				return cost, true
-			}
-		}
-	case []any:
-		for _, item := range typed {
-			if cost, ok := findProviderCostMinor(item); ok {
-				return cost, true
-			}
-		}
-	}
-
-	return 0, false
-}
-
-func providerCostKey(key string) bool {
-	switch key {
-	case "provider_fee_minor", "providerFeeMinor", "providerFeeInCents", "fee_in_cents", "feeInCents", "transaction_fee_in_cents", "transactionFeeInCents", "cost_minor", "costInCents":
-		return true
 	default:
-		return false
-	}
-}
-
-func exactMinorInteger(value any) (int64, bool) {
-	switch typed := value.(type) {
-	case json.Number:
-		parsed, err := typed.Int64()
-		return parsed, err == nil
-	case string:
-		parsed, err := strconv.ParseInt(strings.TrimSpace(typed), 10, 64)
-		return parsed, err == nil
-	case int64:
-		return typed, true
-	case int:
-		return int64(typed), true
-	default:
+		// No live provider currently has a verified provider-cost contract in the
+		// repository. Keep cost unknown until the adapter normalizes a documented
+		// cost field with explicit integer-minor semantics.
 		return 0, false
 	}
 }
