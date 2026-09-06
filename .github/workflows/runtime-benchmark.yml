@@ -42,5 +42,22 @@ jobs:
             grep -q '"code":"preview_read_only"' "${label}-mutation.json"
           }
 
-          probe railway_final https://flash-pag-phase3-final-preview-production.up.railway.app
+          probe_admin_auth_boundary() {
+            base="$1"
+            for path in \
+              /console/api/admin/tenants \
+              /console/api/admin/merchants/00000000-0000-4000-8000-000000000000/members \
+              /console/api/admin/organizations/00000000-0000-4000-8000-000000000000/stats; do
+              body="$(mktemp)"
+              status="$(curl -sS --max-time 30 -o "$body" -w '%{http_code}' "${base}${path}")"
+              echo "unauth ${path} status=${status}"
+              cat "$body"; echo
+              test "${status}" = "401"
+              rm -f "$body"
+            done
+          }
+
+          FINAL=https://flash-pag-phase3-final-preview-production.up.railway.app
+          probe railway_final "$FINAL"
           probe railway_stable https://flash-pag-react-preview-production.up.railway.app
+          probe_admin_auth_boundary "$FINAL"
