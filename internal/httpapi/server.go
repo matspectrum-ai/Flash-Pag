@@ -29,10 +29,12 @@ func New(cfg config.Config, sb *supabase.Client, box *cryptobox.Box, providers *
 	s.routes()
 	return s
 }
-func (s *Server) Handler() http.Handler { return securityHeaders(s.mux) }
+func (s *Server) Handler() http.Handler { return securityHeaders(previewReadOnly(s.cfg.PreviewReadOnly, s.mux)) }
 
 func (s *Server) routes() {
-	s.mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, http.StatusOK, map[string]any{"ok": true}) })
+	s.mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "preview_read_only": s.cfg.PreviewReadOnly})
+	})
 	s.mux.HandleFunc("GET /docs", s.docs)
 	s.mux.HandleFunc("GET /openapi.yaml", s.openapi)
 
@@ -86,6 +88,27 @@ func (s *Server) routes() {
 
 	s.mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/app/", http.StatusTemporaryRedirect)
+	})
+}
+
+func previewReadOnly(enabled bool, next http.Handler) http.Handler {
+	if !enabled {
+		return next
+	}
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/console/session" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		switch r.Method {
+		case http.MethodGet, http.MethodHead, http.MethodOptions:
+			next.ServeHTTP(w, r)
+			return
+		default:
+			writeError(w, http.StatusLocked, "preview_read_only", "This preview is read-only; mutating operations are disabled")
+		}
 	})
 }
 
