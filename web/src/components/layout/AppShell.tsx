@@ -3,6 +3,7 @@ import {
   ArrowLeftRight,
   BookOpen,
   Building2,
+  CircleAlert,
   CircleDollarSign,
   Home,
   KeyRound,
@@ -68,6 +69,7 @@ export function AppShell() {
   const location = useLocation()
   const { me, organizationId, setOrganizationId, logout } = useSession()
   const meta = pageMeta[location.pathname] ?? pageMeta['/']
+  const previewReadOnly = import.meta.env.VITE_PREVIEW_READ_ONLY === 'true'
 
   return (
     <div className="app-shell">
@@ -139,7 +141,18 @@ export function AppShell() {
         </header>
 
         <div className="app-content">
-          <Outlet />
+          <div className="page-stack">
+            {previewReadOnly ? (
+              <div className="attention-banner" role="status">
+                <div className="attention-icon"><CircleAlert size={17} /></div>
+                <div>
+                  <strong>Preview somente leitura</strong>
+                  <span>Este ambiente usa dados reais para inspeção visual, mas operações que alteram estado estão bloqueadas no backend.</span>
+                </div>
+              </div>
+            ) : null}
+            <Outlet />
+          </div>
         </div>
       </main>
     </div>
