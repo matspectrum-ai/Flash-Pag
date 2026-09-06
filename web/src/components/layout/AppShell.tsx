@@ -29,7 +29,7 @@ const navGroups = [
     ],
   },
   {
-    label: 'Relacionamento',
+    label: '',
     items: [{ to: '/customers', label: 'Clientes', icon: Users }],
   },
   {
