@@ -4,6 +4,7 @@ ENV VITE_PREVIEW_READ_ONLY=$VITE_PREVIEW_READ_ONLY
 WORKDIR /src
 COPY web/package.json ./web/package.json
 COPY web/tsconfig.json web/vite.config.ts web/index.html ./web/
+COPY web/public ./web/public
 COPY web/src ./web/src
 RUN cd web && npm install --no-audit --no-fund && npm run build
 
