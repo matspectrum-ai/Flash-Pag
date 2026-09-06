@@ -4,7 +4,6 @@ import {
   BookOpen,
   Building2,
   CircleDollarSign,
-  CreditCard,
   Home,
   KeyRound,
   Landmark,
@@ -66,7 +65,7 @@ const pageMeta: Record<string, { title: string; subtitle?: string }> = {
 
 export function AppShell() {
   const location = useLocation()
-  const { me, organization, organizationId, setOrganizationId, logout } = useSession()
+  const { me, organizationId, setOrganizationId, logout } = useSession()
   const meta = pageMeta[location.pathname] ?? pageMeta['/']
 
   return (
@@ -76,7 +75,7 @@ export function AppShell() {
           <div className="brand-mark">F</div>
           <div>
             <strong>Flash Pag</strong>
-            <span>Pix Gateway</span>
+            <span>Infraestrutura Pix</span>
           </div>
         </div>
 
@@ -109,7 +108,7 @@ export function AppShell() {
             <div className="avatar">{me?.user.email?.charAt(0).toUpperCase() || 'F'}</div>
             <div className="session-copy">
               <strong>{me?.user.email}</strong>
-              <span>{me?.user.platform_admin ? 'Platform admin' : 'Membro'}</span>
+              <span>{me?.user.platform_admin ? 'Administrador da plataforma' : 'Membro'}</span>
             </div>
           </div>
           <button className="button button-quiet button-full" type="button" onClick={() => void logout()}>
@@ -135,10 +134,6 @@ export function AppShell() {
                 ))}
               </select>
             </label>
-            <div className="organization-identity" aria-label="Organização atual">
-              <CreditCard size={15} />
-              <span>{organization?.name || 'Sem organização'}</span>
-            </div>
           </div>
         </header>
 
