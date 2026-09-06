@@ -1,7 +1,9 @@
 import type {
   AdminKYCDetail,
   AdminMerchantInput,
+  AdminMerchantMembersResponse,
   AdminOrganizationInput,
+  AdminTenantInventory,
   ApiErrorShape,
   ApiKeyInput,
   CreatedApiKey,
@@ -165,6 +167,9 @@ export const api = {
       withOrganization(`/console/api/transactions/${transactionId}/reconcile`, organizationId),
       { method: 'POST', body: '{}' },
     ),
+  adminTenants: () => request<AdminTenantInventory>('/console/api/admin/tenants'),
+  adminMerchantMembers: (merchantId: string) =>
+    request<AdminMerchantMembersResponse>(`/console/api/admin/merchants/${encodeURIComponent(merchantId)}/members`),
   adminKYCQueue: () => request<ListResponse<PlatformKYCRow>>('/console/api/admin/kyc'),
   adminKYCDetail: (merchantId: string) => request<AdminKYCDetail>(`/console/api/admin/kyc/${encodeURIComponent(merchantId)}`),
   adminKYCStartReview: (merchantId: string, internalNote = '') =>
