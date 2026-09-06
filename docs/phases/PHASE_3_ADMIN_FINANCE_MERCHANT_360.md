@@ -5,7 +5,8 @@ Status: IN PROGRESS.
 Development branch: `feat/admin-finance-merchant-360`.
 
 Recovered implementation baseline after timeout: `9f0cac522be4735f0a5028b8d49dba1a1f65ddef`.
-Validated implementation checkpoint: `d2578b2f26b9109696be66b6a56154666d2674a3`.
+Previously validated preview checkpoint: `8e158676d2e4a7dd4f2fac5c5a1a087567ecb541`.
+Latest code checkpoint before this documentation update: `395da84d539579d647c37b23cba98104fbc62c46`.
 
 ## Goal
 
@@ -38,10 +39,10 @@ For a selected Merchant, the admin must be able to inspect:
 - All Organizations belonging to the Merchant.
 - KYC/KYB status and relevant business fields.
 - Current Pix pricing.
-- Merchant members and roles.
-- Accounts and balances by Organization.
-- Customer counts by Organization.
-- Provider connections by Organization.
+- Merchant members and roles, including Merchants with zero Organizations.
+- Accounts and Organization-level balance context.
+- Exact customer/account/provider-connection counts by Organization.
+- Provider connection details by Organization.
 - Consolidated recent Pix activity and financial metrics across Organizations.
 
 ## Explicit exclusions / guardrails
@@ -53,20 +54,25 @@ For a selected Merchant, the admin must be able to inspect:
 - Refund/reversal ledgering may receive technical hardening if required by correctness, but it does not replace or reorder Phase 3.
 - Do not touch the Railway production service `flash-pag` during implementation/preview validation.
 
-## Current implementation recovered and reconciled from Git
+## Current implementation reconciled from Git
 
 Backend/read-contract work:
 - `internal/httpapi/handlers_pricing.go` reads `provider_payload` only inside the server, removes it from responses, and attaches `provider_cost_minor` only for platform admins when the cost helper can prove the value is known.
 - `internal/httpapi/provider_cost.go` accepts only verified provider-specific semantics. In the current repository, `mock` is known zero-cost; live providers including Pixhub return unknown.
 - `internal/httpapi/provider_cost_test.go` verifies that plausible Pixhub fields such as `feeInCents`, `provider_fee_minor` or generic fee/cost keys are not treated as actual provider cost without a verified contract.
-- There is currently no dedicated admin-finance endpoint. Admin Financeiro and Merchant 360° aggregate existing organization-scoped contracts using platform-admin authorization. This preserves the Phase 3 no-migration/no-extra-read-model decision and is acceptable for the current beta while limits are visible.
+- `internal/httpapi/handlers_admin_tenants.go` provides a paginated read-only admin tenant inventory and merchant-level membership reads. Inventory safety ceilings are explicit and return `complete=false` rather than silently truncating.
+- `internal/supabase/count.go` adds exact PostgREST counting without materializing full result sets.
+- `internal/httpapi/handlers_admin_org_stats.go` exposes exact Organization counts for accounts, customers and provider connections and validates the Organization exists.
+- No Phase 3 database migration is required. These are read contracts over existing data and invariants.
+- There is no dedicated persisted admin-finance read model. Financial aggregation still uses bounded Organization transaction reads, with truncation surfaced to the user.
 
 Frontend/API work:
-- `web/src/api/types.ts` models `fee_minor`, frozen pricing fields and platform-admin `provider_cost_minor`.
-- `web/src/api/client.ts` provides bounded organization transaction reads, capped server-side at 1,000 rows.
-- `web/src/features/platform/admin-finance.ts` implements period filtering and financial aggregation semantics.
-- `web/src/features/platform/AdminFinancePage.tsx` implements the global financial dashboard, 7/30/90-day views, chart, merchant ranking and global Pix transaction table.
-- `web/src/features/platform/Merchant360Page.tsx` implements the merchant drill-down across all Organizations, including KYC, pricing, members, account/balance context, customer counts, provider connections and recent Pix activity.
+- `web/src/api/types.ts` models frozen pricing, platform-admin provider cost, tenant-inventory completeness and merchant-member completeness.
+- `web/src/api/client.ts` exposes tenant inventory, merchant members, exact Organization stats and bounded transaction reads.
+- `web/src/features/platform/admin-finance.ts` implements deterministic period filtering and financial aggregation semantics.
+- `web/src/features/platform/AdminFinancePage.tsx` implements the global financial dashboard, 7/30/90-day views, chart, merchant ranking and global Pix transaction table. It uses the dedicated admin inventory instead of bounded `/me` arrays and surfaces incomplete inventory/transaction windows.
+- `web/src/features/platform/Merchant360Page.tsx` implements merchant drill-down across zero, one or multiple Organizations, including KYC, pricing, members, accounts, balance context, exact operational counts, provider connections and recent Pix activity.
+- Transaction table columns use `Valor` at row level; TPV remains an aggregate metric and is not used as a synonym for every transaction amount.
 - `web/src/features/platform/admin-finance.css` implements responsive Phase 3 layouts.
 - `web/src/app/App.tsx` registers `/platform/finance` and `/platform/merchants/:merchantId`.
 - `web/src/components/layout/AppShell.tsx` exposes Financeiro to platform admins on desktop/mobile and provides Merchant 360° route context.
@@ -74,13 +80,14 @@ Frontend/API work:
 
 ## Implementation principles
 
-- Prefer aggregating existing organization-scoped contracts before introducing schema.
+- Prefer read-only contracts over new persistence when existing facts can be queried correctly.
 - Platform admins may read organization-scoped APIs across tenants because authorization is enforced server-side.
 - Keep provider payload server-side; expose only sanitized derived cost evidence.
 - Never treat a field as provider cost merely because its name resembles `fee` or `cost`; the provider adapter/contract must define its semantics and integer-minor unit explicitly.
 - Keep financial calculation logic deterministic and isolated from presentation components.
+- Never infer global/exact counts from bounded arrays. Use pagination or exact count contracts and surface safety ceilings.
 - If a transaction window is truncated by a read limit, surface that limitation rather than pretending totals are complete.
-- The current beta implementation fans out reads by Organization. Replace it with a purpose-built server-side read model only when measured merchant/organization scale or latency justifies that complexity.
+- Replace client fan-out with a purpose-built server-side financial read model only when measured scale, latency or historical-query requirements justify that complexity.
 
 ## Acceptance criteria
 
@@ -90,7 +97,10 @@ Functional:
 - Margin is unavailable when provider-cost evidence is incomplete.
 - No net-profit label exists.
 - Global transaction list shows only Pix received for this phase.
+- Global tenant inventory does not silently inherit `/me` list limits.
 - Merchant 360° supports Merchants with zero, one or multiple Organizations.
+- Merchant members remain readable even when the Merchant has zero Organizations.
+- Organization customer/account/provider counts shown as exact are backed by exact count contracts.
 - Merchant 360° shows organization-scoped balances, accounts, customers and connections without crossing tenant boundaries incorrectly.
 - KYC and current pricing are shown at Merchant level.
 - Platform navigation exposes Financeiro without changing merchant navigation scope.
@@ -114,20 +124,13 @@ Verification:
 - A safe mutation probe is rejected by preview middleware with HTTP 423 `preview_read_only`.
 - Railway production service `flash-pag` remains bound to `feat/minimal-pix-gateway` before and after validation.
 
-## Validated implementation checkpoint
+## Verification history
 
-Commit `d2578b2f26b9109696be66b6a56154666d2674a3` passed the full GitHub CI workflow: formatting check, TypeScript typecheck, Vite build, Go tests and Go vet.
+Preview commit `8e158676d2e4a7dd4f2fac5c5a1a087567ecb541` passed the full GitHub CI workflow and Railway deployment `a176782f-224b-42c7-92c6-5a1121b2d306` completed successfully. Runtime validation confirmed health, SPA fallback and backend read-only enforcement.
 
-Railway preview deployment `b96fc6dc-be7b-4660-ba4e-166e858593a6` deployed that exact commit from `feat/admin-finance-merchant-360` and completed successfully. Runtime validation produced:
-- `GET /healthz` → HTTP 200, `{"ok":true,"preview_read_only":true}`.
-- `POST /console/register` with harmless `{}` → HTTP 423, code `preview_read_only`; no registration handler mutation executed.
-- `GET /app/` → HTTP 200 with React root and bundled assets.
-- `GET /app/platform/finance` → HTTP 200 with the same SPA fallback.
-- `GET /app/platform/merchants/00000000-0000-0000-0000-000000000000` → HTTP 200 with the same SPA fallback.
+The later code checkpoint `395da84d539579d647c37b23cba98104fbc62c46` adds correctness hardening for complete tenant inventory, zero-Organization merchant membership and exact Organization counts. Its substantive CI stages (formatting, TypeScript typecheck, Vite build, Go tests and Go vet) passed before this documentation update. Because documentation changes create a newer head, final exact-head CI and Railway preview validation are still required.
 
-Production `flash-pag` remained on `feat/minimal-pix-gateway` throughout the checkpoint.
-
-Phase 3 intentionally remains IN PROGRESS after this technical checkpoint. Authenticated visual/product acceptance and any further agreed Phase 3 refinements should be completed before changing status to COMPLETE.
+Phase 3 intentionally remains IN PROGRESS. Authenticated visual/product acceptance and any further agreed Phase 3 refinements should be completed before changing status to COMPLETE.
 
 ## Definition of phase completion
 
