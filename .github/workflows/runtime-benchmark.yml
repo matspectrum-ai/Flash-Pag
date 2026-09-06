@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Probe Railway and Render previews
+      - name: Probe exact Phase 3 Railway preview
         shell: bash
         run: |
           set -euo pipefail
@@ -25,6 +25,7 @@ jobs:
             echo "health status=${health_status} time_total=${health_time}"
             cat "${label}-health.json"; echo
             test "${health_status}" = "200"
+            grep -q '"preview_read_only":true' "${label}-health.json"
 
             for path in /app/ /app/platform/finance /app/platform/merchants/00000000-0000-4000-8000-000000000000; do
               status="$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' "${base}${path}")"
@@ -38,14 +39,8 @@ jobs:
             echo "mutation status=${mutation_status} time_total=${mutation_time}"
             cat "${label}-mutation.json"; echo
             test "${mutation_status}" = "423"
-
-            for i in 1 2 3; do
-              status="$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' "${base}/healthz")"
-              elapsed="$(curl -sS --max-time 30 -o /dev/null -w '%{time_total}' "${base}/healthz")"
-              echo "warm_health_${i} status=${status} time_total=${elapsed}"
-              test "${status}" = "200"
-            done
+            grep -q '"code":"preview_read_only"' "${label}-mutation.json"
           }
 
-          probe railway https://flash-pag-react-preview-production.up.railway.app
-          probe render https://flash-pag-render-benchmark.onrender.com
+          probe railway_exact https://flash-pag-phase3-dd630-preview-production.up.railway.app
+          probe railway_stable https://flash-pag-react-preview-production.up.railway.app
