@@ -1,10 +1,20 @@
 import type {
+  AdminMerchantInput,
+  AdminOrganizationInput,
   ApiErrorShape,
+  ApiKeyInput,
+  CreatedApiKey,
+  CreatedWebhookEndpoint,
+  Customer,
+  CustomerInput,
   ListResponse,
   MeResponse,
+  Merchant,
+  Organization,
+  OrganizationAccess,
   SummaryResponse,
   Transaction,
-  TransferInput,
+  WebhookInput,
 } from './types'
 
 export class ApiError extends Error {
@@ -60,10 +70,35 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
   logout: () => request<void>('/console/session', { method: 'DELETE' }),
+  access: (organizationId: string) =>
+    request<OrganizationAccess>(withOrganization('/console/api/access', organizationId)),
   summary: (organizationId: string) =>
     request<SummaryResponse>(withOrganization('/console/api/summary', organizationId)),
   list: <T>(resource: string, organizationId: string) =>
     request<ListResponse<T>>(withOrganization(`/console/api/${resource}`, organizationId)),
+  createCustomer: (organizationId: string, input: CustomerInput) =>
+    request<Customer>(withOrganization('/console/api/customers', organizationId), {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  createAPIKey: (organizationId: string, input: ApiKeyInput) =>
+    request<CreatedApiKey>(withOrganization('/console/api/api-keys', organizationId), {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  revokeAPIKey: (organizationId: string, keyId: string) =>
+    request<void>(withOrganization(`/console/api/api-keys/${keyId}`, organizationId), {
+      method: 'DELETE',
+    }),
+  createWebhook: (organizationId: string, input: WebhookInput) =>
+    request<CreatedWebhookEndpoint>(withOrganization('/console/api/webhook-endpoints', organizationId), {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  deleteWebhook: (organizationId: string, webhookId: string) =>
+    request<void>(withOrganization(`/console/api/webhook-endpoints/${webhookId}`, organizationId), {
+      method: 'DELETE',
+    }),
   testConnection: (connectionId: string, organizationId: string) =>
     request<Record<string, unknown>>(
       withOrganization(`/console/api/provider-connections/${connectionId}/test`, organizationId),
@@ -74,8 +109,13 @@ export const api = {
       withOrganization(`/console/api/transactions/${transactionId}/reconcile`, organizationId),
       { method: 'POST', body: '{}' },
     ),
-  createTransfer: (organizationId: string, input: TransferInput) =>
-    request<Transaction>(withOrganization('/console/api/transfers', organizationId), {
+  adminCreateMerchant: (input: AdminMerchantInput) =>
+    request<Merchant>('/console/api/admin/merchants', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  adminCreateOrganization: (input: AdminOrganizationInput) =>
+    request<Organization & { accounts?: unknown[] }>('/console/api/admin/organizations', {
       method: 'POST',
       body: JSON.stringify(input),
     }),
