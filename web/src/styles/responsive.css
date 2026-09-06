@@ -1,0 +1,229 @@
+.toolbar-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.toolbar-copy strong {
+  color: var(--fp-text);
+  font-size: 12px;
+  font-weight: 680;
+}
+
+.toolbar-copy span {
+  color: var(--fp-text-tertiary);
+  font-size: 10.5px;
+}
+
+@media (max-width: 1100px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    width: 100%;
+    height: auto;
+    padding: 10px 12px 0;
+    border-right: 0;
+    border-bottom: 1px solid #1c1c22;
+    overflow: visible;
+    background: rgba(11, 11, 14, .97);
+    backdrop-filter: blur(14px);
+  }
+
+  .sidebar-brand {
+    padding: 0 4px 9px;
+  }
+
+  .sidebar-nav {
+    display: flex;
+    flex-direction: row;
+    gap: 4px;
+    padding: 0 0 9px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+
+  .sidebar-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-group {
+    display: flex;
+    flex: 0 0 auto;
+    gap: 3px;
+  }
+
+  .nav-group-label,
+  .sidebar-footer {
+    display: none;
+  }
+
+  .nav-item {
+    min-height: 36px;
+    padding: 0 11px;
+    white-space: nowrap;
+    border: 1px solid transparent;
+  }
+
+  .nav-item.active {
+    box-shadow: none;
+    border-color: #303039;
+  }
+
+  .platform-nav {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .app-header {
+    min-height: auto;
+    padding: 18px 18px 14px;
+  }
+
+  .app-content {
+    padding: 0 18px 32px;
+  }
+
+  .home-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .balance-card {
+    grid-column: 1 / -1;
+  }
+
+  .content-grid-main,
+  .accounts-hero {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .sidebar {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+
+  .sidebar-brand {
+    padding-bottom: 8px;
+  }
+
+  .sidebar-brand .brand-mark {
+    width: 28px;
+    height: 28px;
+  }
+
+  .sidebar-brand > div:last-child span {
+    display: none;
+  }
+
+  .nav-item {
+    min-height: 34px;
+    padding: 0 10px;
+    font-size: 11.5px;
+  }
+
+  .app-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 13px;
+    padding: 16px 14px 12px;
+  }
+
+  .page-heading h1 {
+    font-size: 24px;
+  }
+
+  .page-heading p {
+    margin-top: 5px;
+    line-height: 1.45;
+  }
+
+  .header-actions,
+  .organization-switcher,
+  .organization-switcher select {
+    width: 100%;
+  }
+
+  .organization-switcher select {
+    min-width: 0;
+  }
+
+  .app-content {
+    padding: 0 14px 26px;
+  }
+
+  .home-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .balance-card {
+    grid-column: auto;
+    min-height: 164px;
+  }
+
+  .balance-card-bottom {
+    align-items: flex-end;
+    gap: 12px;
+  }
+
+  .balance-actions {
+    flex-direction: column;
+    width: min(150px, 48%);
+  }
+
+  .metric-card {
+    min-height: 126px;
+  }
+
+  .attention-banner {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .attention-banner .button {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .toolbar {
+    min-height: 0;
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .toolbar-right {
+    width: 100%;
+    flex-direction: column;
+  }
+
+  .search-field,
+  .compact-select {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .panel {
+    border-radius: 14px;
+  }
+
+  .panel-header {
+    min-height: 62px;
+    padding: 13px 14px;
+  }
+
+  .data-table {
+    min-width: 620px;
+  }
+
+  .drawer {
+    width: 100%;
+    max-width: none;
+  }
+}
