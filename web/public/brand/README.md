@@ -1,0 +1,1 @@
+Official Flash Pag brand assets. The production mark is loaded by the React app from /app/brand/flash-pag-mark.png.
