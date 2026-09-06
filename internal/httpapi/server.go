@@ -64,6 +64,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /console/api/api-keys", s.withConsoleAuth(s.consoleSensitiveList("api-keys")))
 	s.mux.HandleFunc("GET /console/api/webhook-endpoints", s.withConsoleAuth(s.consoleSensitiveList("webhook-endpoints")))
 	s.mux.HandleFunc("GET /console/api/provider-connections", s.withConsoleAuth(s.consoleSensitiveList("provider-connections")))
+	s.mux.HandleFunc("GET /console/api/transactions", s.withConsoleAuth(s.consolePricedTransactions))
 
 	s.mux.HandleFunc("GET /console/api/members", s.withConsoleAuth(s.consoleMembers))
 	s.mux.HandleFunc("POST /console/api/members", s.withConsoleAuth(s.consoleCreateMember))
@@ -88,6 +89,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /console/api/admin/kyc/{merchantID}/documents/{id}", s.withAdmin(s.adminDownloadKYCDocument))
 	s.mux.HandleFunc("POST /console/api/admin/kyc/{merchantID}/review", s.withAdmin(s.adminStartKYCReview))
 	s.mux.HandleFunc("POST /console/api/admin/kyc/{merchantID}/decision", s.withAdmin(s.adminDecideKYC))
+	s.mux.HandleFunc("GET /console/api/admin/pricing/{merchantID}", s.withAdmin(s.adminPricingDetail))
+	s.mux.HandleFunc("POST /console/api/admin/pricing/{merchantID}", s.withAdmin(s.adminSetPricing))
 	s.mux.HandleFunc("POST /console/api/admin/merchants", s.withAdmin(s.adminCreateMerchantWithKYC))
 	s.mux.HandleFunc("POST /console/api/admin/organizations", s.withAdmin(s.adminCreateOrganization))
 	s.mux.HandleFunc("POST /console/api/admin/members", s.withAdmin(s.adminAddMember))
