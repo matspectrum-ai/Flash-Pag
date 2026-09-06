@@ -177,6 +177,13 @@ export const api = {
     }),
   adminKYCDocumentURL: (merchantId: string, documentId: string) =>
     `/console/api/admin/kyc/${encodeURIComponent(merchantId)}/documents/${encodeURIComponent(documentId)}`,
+  adminPricingDetail: (merchantId: string) =>
+    request<Record<string, unknown>>(`/console/api/admin/pricing/${encodeURIComponent(merchantId)}`),
+  adminSetPricing: (merchantId: string, input: unknown) =>
+    request<Record<string, unknown>>(`/console/api/admin/pricing/${encodeURIComponent(merchantId)}`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
   adminCreateMerchant: (input: AdminMerchantInput) =>
     request<Merchant>('/console/api/admin/merchants', {
       method: 'POST',
