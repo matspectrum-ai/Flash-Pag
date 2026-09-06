@@ -23,6 +23,7 @@ function isIncoming(transaction: Transaction) {
 export function TransactionsPage() {
   const { organizationId } = useSession()
   const queryClient = useQueryClient()
+  const previewReadOnly = import.meta.env.VITE_PREVIEW_READ_ONLY === 'true'
   const [direction, setDirection] = useState<DirectionFilter>('all')
   const [status, setStatus] = useState('all')
   const [search, setSearch] = useState('')
@@ -179,16 +180,16 @@ export function TransactionsPage() {
                 <CircleAlert size={17} />
                 <div>
                   <strong>{selected.status === 'ambiguous' ? 'Resultado ainda não confirmado' : 'Operação em processamento'}</strong>
-                  <span>A reconciliação consulta o provider sem criar uma segunda movimentação.</span>
+                  <span>{previewReadOnly ? 'A reconciliação está desabilitada neste preview para não alterar o ledger real.' : 'A reconciliação consulta o provider sem criar uma segunda movimentação.'}</span>
                 </div>
                 <button
                   className="button button-secondary"
                   type="button"
-                  disabled={reconcileMutation.isPending}
+                  disabled={reconcileMutation.isPending || previewReadOnly}
                   onClick={() => reconcileMutation.mutate(selected)}
                 >
                   <RefreshCw size={14} className={reconcileMutation.isPending ? 'spin' : ''} />
-                  {reconcileMutation.isPending ? 'Consultando…' : 'Reconciliar'}
+                  {previewReadOnly ? 'Indisponível no preview' : reconcileMutation.isPending ? 'Consultando…' : 'Reconciliar'}
                 </button>
               </div>
             ) : null}
