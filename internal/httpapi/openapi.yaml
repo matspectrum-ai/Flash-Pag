@@ -1,0 +1,206 @@
+openapi: 3.1.0
+info:
+  title: Flash Pag Pix API
+  version: 0.1.0
+  description: Minimal multi-provider Pix gateway. Monetary amounts are integer centavos (BRL minor units).
+servers:
+  - url: /
+security:
+  - ApiKey: []
+tags:
+  - name: Pix
+  - name: Balance
+  - name: Transactions
+  - name: Customers
+  - name: Webhooks
+  - name: Integrations
+paths:
+  /v1/balance:
+    get:
+      tags: [Balance]
+      summary: Get available and reserved balance
+      parameters:
+        - in: query
+          name: account_id
+          schema: {type: string, format: uuid}
+      responses:
+        '200': {description: Balance, content: {application/json: {schema: {$ref: '#/components/schemas/Balance'}}}}
+  /v1/pix/charges:
+    post:
+      tags: [Pix]
+      summary: Create a Pix charge
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CreateCharge'}
+      responses:
+        '201': {description: Charge accepted, content: {application/json: {schema: {$ref: '#/components/schemas/Transaction'}}}}
+        '409': {description: Idempotency conflict or operation still processing}
+        '422': {description: Invalid request or provider final rejection}
+        '502': {description: Ambiguous provider outcome; do not create a new payment identity}
+  /v1/pix/charges/{id}:
+    get:
+      tags: [Pix]
+      summary: Get Pix charge/transaction status
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string, format: uuid}
+      responses:
+        '200': {description: Transaction, content: {application/json: {schema: {$ref: '#/components/schemas/Transaction'}}}}
+  /v1/transfers:
+    post:
+      tags: [Pix]
+      summary: Create a Pix transfer
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/CreateOutbound'}}}
+      responses:
+        '201': {description: Transfer accepted, content: {application/json: {schema: {$ref: '#/components/schemas/Transaction'}}}}
+        '502': {description: Ambiguous provider outcome; funds remain reserved}
+  /v1/withdrawals:
+    post:
+      tags: [Pix]
+      summary: Create a withdrawal to a Pix key
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/CreateOutbound'}}}
+      responses:
+        '201': {description: Withdrawal accepted, content: {application/json: {schema: {$ref: '#/components/schemas/Transaction'}}}}
+  /v1/transactions:
+    get:
+      tags: [Transactions]
+      summary: List organization transactions
+      responses:
+        '200': {description: Transactions}
+  /v1/accounts:
+    get:
+      tags: [Balance]
+      summary: List organization accounts
+      responses:
+        '200': {description: Accounts}
+  /v1/customers:
+    get:
+      tags: [Customers]
+      summary: List customers
+      responses: {'200': {description: Customers}}
+    post:
+      tags: [Customers]
+      summary: Create a customer record
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/CreateCustomer'}}}
+      responses: {'201': {description: Customer created}}
+  /v1/integrations:
+    get:
+      tags: [Integrations]
+      summary: List configured provider connections and installed adapters
+      responses: {'200': {description: Integrations}}
+  /v1/webhooks:
+    get:
+      tags: [Webhooks]
+      summary: List outbound webhook endpoints
+      responses: {'200': {description: Endpoints}}
+    post:
+      tags: [Webhooks]
+      summary: Register an outbound webhook endpoint
+      description: Returns the signing secret exactly once.
+      requestBody:
+        required: true
+        content: {application/json: {schema: {$ref: '#/components/schemas/CreateWebhook'}}}
+      responses: {'201': {description: Endpoint created}}
+  /v1/webhooks/{id}:
+    delete:
+      tags: [Webhooks]
+      summary: Delete an outbound webhook endpoint
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string, format: uuid}
+      responses: {'204': {description: Deleted}}
+components:
+  securitySchemes:
+    ApiKey:
+      type: apiKey
+      in: header
+      name: X-API-Key
+  parameters:
+    IdempotencyKey:
+      in: header
+      name: Idempotency-Key
+      required: true
+      schema: {type: string, minLength: 8, maxLength: 200}
+      description: Stable request identity. Same key with different semantic input is rejected.
+  schemas:
+    MoneyMinor:
+      type: integer
+      format: int64
+      minimum: 1
+      description: Integer centavos. R$ 10,50 = 1050.
+    Balance:
+      type: object
+      properties:
+        account_id: {type: string, format: uuid}
+        currency: {const: BRL}
+        available_minor: {type: integer, format: int64}
+        reserved_minor: {type: integer, format: int64}
+        total_minor: {type: integer, format: int64}
+    CreateCharge:
+      type: object
+      required: [amount_minor]
+      properties:
+        account_id: {type: string, format: uuid}
+        customer_id: {type: string, format: uuid}
+        amount_minor: {$ref: '#/components/schemas/MoneyMinor'}
+        currency: {type: string, default: BRL, enum: [BRL]}
+        description: {type: string, maxLength: 500}
+        provider: {type: string, default: mock}
+        provider_connection_id: {type: string, format: uuid}
+    CreateOutbound:
+      type: object
+      required: [amount_minor, pix_key]
+      properties:
+        account_id: {type: string, format: uuid}
+        amount_minor: {$ref: '#/components/schemas/MoneyMinor'}
+        currency: {type: string, default: BRL, enum: [BRL]}
+        pix_key: {type: string}
+        description: {type: string}
+        provider: {type: string, default: mock}
+        provider_connection_id: {type: string, format: uuid}
+    CreateCustomer:
+      type: object
+      properties:
+        external_id: {type: string}
+        name: {type: string}
+        email: {type: string, format: email}
+        document: {type: string}
+        metadata: {type: object, additionalProperties: true}
+    CreateWebhook:
+      type: object
+      required: [url]
+      properties:
+        url: {type: string, format: uri}
+        description: {type: string}
+        events:
+          type: array
+          items: {type: string}
+          default: [transaction.*]
+    Transaction:
+      type: object
+      properties:
+        id: {type: string, format: uuid}
+        kind: {type: string, enum: [pix_in, transfer, withdrawal]}
+        direction: {type: string, enum: [in, out]}
+        status: {type: string, enum: [pending, succeeded, failed, ambiguous]}
+        amount_minor: {type: integer, format: int64}
+        currency: {const: BRL}
+        provider_code: {type: string}
+        provider_external_id: {type: [string, 'null']}
+        qr_code: {type: [string, 'null']}
+        created_at: {type: string, format: date-time}

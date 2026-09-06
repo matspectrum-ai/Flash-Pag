@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Flash Pag</title>
+  <link rel="stylesheet" href="/console/styles.css">
+</head>
+<body>
+  <main id="login" class="login hidden">
+    <form id="login-form" class="login-card">
+      <div class="brand-mark">F</div>
+      <h1>Flash Pag</h1>
+      <p>Gateway Pix</p>
+      <label>E-mail<input id="email" type="email" autocomplete="username" required></label>
+      <label>Senha<input id="password" type="password" autocomplete="current-password" required></label>
+      <button type="submit">Entrar</button>
+      <div id="login-error" class="error"></div>
+    </form>
+  </main>
+
+  <div id="app" class="app hidden">
+    <aside>
+      <div class="brand"><div class="brand-mark small">F</div><div><strong>Flash Pag</strong><span>Pix Gateway</span></div></div>
+      <nav>
+        <button data-view="dashboard" class="active">Dashboard</button>
+        <button data-view="transactions">Transações</button>
+        <button data-view="transfers">Transferências</button>
+        <button data-view="customers">Clientes</button>
+        <button data-view="integrations">Integrações</button>
+        <button data-view="webhooks">Webhooks</button>
+        <button data-view="accounts">Contas</button>
+        <button data-view="organizations">Organizações</button>
+        <button data-view="admin" id="admin-nav" class="hidden">Admin</button>
+      </nav>
+      <div class="aside-footer"><span id="user-email"></span><button id="logout" class="ghost">Sair</button></div>
+    </aside>
+    <section class="main">
+      <header><div><h1 id="page-title">Dashboard</h1><p id="page-subtitle">Visão operacional</p></div><select id="org-select"></select></header>
+      <div id="flash" class="flash hidden"></div>
+      <div id="content"></div>
+    </section>
+  </div>
+  <script src="/console/app.js"></script>
+</body>
+</html>
