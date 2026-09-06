@@ -183,7 +183,7 @@
   const originalNavigate = navigate;
   navigate = function(view) {
     originalNavigate(view);
-    window.scrollTo({ top: 0, behavior: 'instant' });
+    window.scrollTo({ top: 0, behavior: 'auto' });
   };
 
   const originalDrawer = drawer;
