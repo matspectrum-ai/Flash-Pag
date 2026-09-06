@@ -1,0 +1,51 @@
+name: runtime-benchmark
+
+on:
+  push:
+    branches:
+      - benchmark/runtime-probes-20260906
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe Railway and Render previews
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          probe() {
+            label="$1"
+            base="$2"
+            echo "=== ${label} ==="
+
+            health_status="$(curl -sS --max-time 30 -o "${label}-health.json" -w '%{http_code}' "${base}/healthz")"
+            health_time="$(curl -sS --max-time 30 -o /dev/null -w '%{time_total}' "${base}/healthz")"
+            echo "health status=${health_status} time_total=${health_time}"
+            cat "${label}-health.json"; echo
+            test "${health_status}" = "200"
+
+            for path in /app/ /app/platform/finance /app/platform/merchants/00000000-0000-4000-8000-000000000000; do
+              status="$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' "${base}${path}")"
+              elapsed="$(curl -sS --max-time 30 -o /dev/null -w '%{time_total}' "${base}${path}")"
+              echo "${path} status=${status} time_total=${elapsed}"
+              test "${status}" = "200"
+            done
+
+            mutation_status="$(curl -sS --max-time 30 -o "${label}-mutation.json" -w '%{http_code}' -H 'Content-Type: application/json' -d '{}' "${base}/console/register")"
+            mutation_time="$(curl -sS --max-time 30 -o /dev/null -w '%{time_total}' -H 'Content-Type: application/json' -d '{}' "${base}/console/register")"
+            echo "mutation status=${mutation_status} time_total=${mutation_time}"
+            cat "${label}-mutation.json"; echo
+            test "${mutation_status}" = "423"
+
+            for i in 1 2 3; do
+              status="$(curl -sS --max-time 30 -o /dev/null -w '%{http_code}' "${base}/healthz")"
+              elapsed="$(curl -sS --max-time 30 -o /dev/null -w '%{time_total}' "${base}/healthz")"
+              echo "warm_health_${i} status=${status} time_total=${elapsed}"
+              test "${status}" = "200"
+            done
+          }
+
+          probe railway https://flash-pag-react-preview-production.up.railway.app
+          probe render https://flash-pag-render-benchmark.onrender.com
