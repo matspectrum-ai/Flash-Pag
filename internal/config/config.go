@@ -15,6 +15,7 @@ type Config struct {
 	SupabaseSecretKey      string
 	SupabasePublishableKey string
 	CookieSecure           bool
+	PreviewReadOnly        bool
 	MasterKey              []byte
 	WebhookPollInterval    time.Duration
 }
@@ -27,6 +28,7 @@ func Load() (Config, error) {
 		SupabaseSecretKey:      os.Getenv("SUPABASE_SECRET_KEY"),
 		SupabasePublishableKey: os.Getenv("SUPABASE_PUBLISHABLE_KEY"),
 		CookieSecure:           strings.EqualFold(env("COOKIE_SECURE", "false"), "true"),
+		PreviewReadOnly:        strings.EqualFold(env("APP_PREVIEW_READ_ONLY", "false"), "true"),
 		WebhookPollInterval:    5 * time.Second,
 	}
 	if cfg.SupabaseURL == "" || cfg.SupabaseSecretKey == "" || cfg.SupabasePublishableKey == "" {
