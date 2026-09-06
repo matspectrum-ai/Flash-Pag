@@ -69,6 +69,12 @@ type ConnectionStatus struct {
 	Currency       string `json:"currency,omitempty"`
 }
 
+type ReconcileResult struct {
+	ExternalID string          `json:"external_id"`
+	Status     string          `json:"status"` // succeeded | failed | pending
+	Raw        json.RawMessage `json:"raw,omitempty"`
+}
+
 type Provider interface {
 	Code() string
 	CreateCharge(context.Context, Connection, ChargeRequest) (ChargeResult, error)
@@ -80,6 +86,12 @@ type Provider interface {
 // authenticated endpoint suitable for validating credentials without moving money.
 type ConnectionTester interface {
 	CheckConnection(context.Context, Connection) (ConnectionStatus, error)
+}
+
+// Reconciler is optional. It resolves a previously created provider operation by the
+// provider's immutable external ID. Implementations must only perform read-only calls.
+type Reconciler interface {
+	Reconcile(context.Context, Connection, string, string) (ReconcileResult, error)
 }
 
 type FinalError struct{ Err error }
