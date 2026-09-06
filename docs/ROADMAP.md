@@ -45,10 +45,11 @@ Required outcome:
 - Global platform financial dashboard.
 - Global metrics with strict semantics:
   - TPV = successful processed `pix_in` volume for the selected period.
-  - Flash Pag revenue = fees charged.
+  - Flash Pag revenue = frozen `fee_minor` realized only on successful Pix.
   - Provider cost = real provider cost supported by verified provider-specific evidence.
   - Margin = revenue − provider cost only when provider-cost coverage is complete.
   - No net-profit metric until all remaining cost categories are modeled.
+- Financial period membership and daily buckets use `America/Sao_Paulo` consistently rather than browser-local or raw UTC calendar boundaries.
 - Time-series / charts for platform financial activity.
 - Global Pix transaction view across Organizations.
 - Merchant ranking / drill-down.
@@ -56,6 +57,7 @@ Required outcome:
 - Merchant 360° containing complete operational context for the merchant and all Organizations, including KYC/KYB, current pricing, members, accounts/balance context, exact customer/account/provider-connection counts, connection details and recent Pix activity.
 - Merchants with zero Organizations remain valid Merchant 360° subjects and can still expose merchant-level membership/KYC/pricing.
 - Explicit incompleteness indicators whenever safety/read limits are reached.
+- Failed administrative reads are shown as unavailable/partial rather than being mislabeled as true empty, zero or unconfigured business state.
 - Platform-admin-only access to global/merchant-wide information.
 - No raw provider payload exposure to the browser.
 
@@ -68,8 +70,8 @@ Release gate:
 1. Implementation complete on `feat/admin-finance-merchant-360`.
 2. Permanent documentation matches the intended head.
 3. CI green on that exact branch head.
-4. Only `flash-pag-react-preview` tracks the Phase 3 development branch.
-5. Preview deployment succeeds from the exact expected SHA.
+4. The canonical Railway preview remains configured for the Phase 3 development branch and remains read-only.
+5. The exact expected SHA is runtime-validated on Railway. If the connector cannot advance a cached canonical-preview snapshot, an isolated read-only Railway service built from an image pinned to the exact Git SHA is acceptable; secrets must remain runtime references and must not be embedded in the image.
 6. `/healthz`, application routes and preview read-only behavior are validated.
 7. Production `flash-pag` remains on `feat/minimal-pix-gateway` and is not changed.
 8. Phase status changes to COMPLETE only after the agreed authenticated product/visual acceptance is complete.
