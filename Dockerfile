@@ -1,7 +1,7 @@
 FROM node:22-alpine AS web-build
 WORKDIR /src
 COPY web/package.json ./web/package.json
-COPY web/tsconfig.json web/tsconfig.node.json web/vite.config.ts web/index.html ./web/
+COPY web/tsconfig.json web/vite.config.ts web/index.html ./web/
 COPY web/src ./web/src
 RUN cd web && npm install --no-audit --no-fund && npm run build
 
