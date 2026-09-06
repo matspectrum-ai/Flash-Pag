@@ -26,15 +26,15 @@ func (s *Server) consoleAccess(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"organization_id":          orgID,
-		"role":                     role,
-		"can_manage":               roleAllowed(role, "owner", "admin"),
-		"can_manage_members":       roleAllowed(role, "owner", "admin"),
-		"can_manage_admins":        role == "owner" || role == "platform_admin",
-		"can_manage_integrations":  roleAllowed(role, "owner", "admin"),
+		"organization_id":           orgID,
+		"role":                      role,
+		"can_manage":                roleAllowed(role, "owner", "admin"),
+		"can_manage_members":        roleAllowed(role, "owner", "admin"),
+		"can_manage_admins":         role == "owner" || role == "platform_admin",
+		"can_manage_integrations":   roleAllowed(role, "owner", "admin"),
 		"can_view_sensitive_config": roleAllowed(role, "owner", "admin"),
-		"can_create_customer":      roleAllowed(role, "owner", "admin", "member"),
-		"can_write_operational":    roleAllowed(role, "owner", "admin", "member"),
+		"can_create_customer":       roleAllowed(role, "owner", "admin", "member"),
+		"can_write_operational":     roleAllowed(role, "owner", "admin", "member"),
 	})
 }
 
@@ -250,6 +250,7 @@ func (s *Server) merchantIDForOrganization(ctx context.Context, orgID string) (s
 var errMemberNotFound = &memberLookupError{}
 
 type memberLookupError struct{}
+
 func (*memberLookupError) Error() string { return "member not found" }
 
 func (s *Server) memberRoleForMerchant(ctx context.Context, merchantID, userID string) (string, bool) {
