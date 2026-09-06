@@ -1,12 +1,16 @@
 import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowDownLeft, ArrowUpRight, ChevronRight, CircleAlert, Network } from 'lucide-react'
+import { ArrowDownLeft, ChevronRight, CircleAlert, Network, ReceiptText } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { api } from '../../api/client'
 import type { ProviderConnection, Transaction } from '../../api/types'
 import { StatusBadge } from '../../components/ui/StatusBadge'
 import { useSession } from '../../app/session'
 import { balanceMinor, formatBRL, formatDateTime, transactionLabel } from '../../lib/format'
+
+function isPixReceipt(transaction: Transaction) {
+  return transaction.direction === 'in' || transaction.kind === 'pix_in'
+}
 
 export function HomePage() {
   const { organizationId } = useSession()
@@ -50,13 +54,13 @@ export function HomePage() {
 
   const summary = summaryQuery.data
   const transactions = transactionsQuery.data?.data ?? []
+  const receipts = transactions.filter(isPixReceipt)
   const connections = connectionsQuery.data?.data ?? []
   const activeConnections = connections.filter((item) => item.status === 'active' && item.provider_code !== 'mock')
   const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
-  const recent = transactions.filter((item) => new Date(item.created_at).getTime() >= cutoff)
+  const recent = receipts.filter((item) => new Date(item.created_at).getTime() >= cutoff)
   const succeeded = recent.filter((item) => item.status === 'succeeded')
-  const received = succeeded.filter((item) => item.direction === 'in' || item.kind === 'pix_in').reduce((sum, item) => sum + item.amount_minor, 0)
-  const sent = succeeded.filter((item) => item.direction === 'out' || item.kind === 'pix_out' || item.kind === 'transfer' || item.kind === 'withdrawal').reduce((sum, item) => sum + item.amount_minor, 0)
+  const received = succeeded.reduce((sum, item) => sum + item.amount_minor, 0)
   const attention = recent.filter((item) => item.status === 'pending' || item.status === 'ambiguous')
   const decided = recent.filter((item) => item.status === 'succeeded' || item.status === 'failed')
   const successRate = decided.length ? Math.round((decided.filter((item) => item.status === 'succeeded').length / decided.length) * 100) : 0
@@ -64,6 +68,7 @@ export function HomePage() {
   const balance = summary?.balance as unknown as Record<string, unknown> | undefined
   const available = balanceMinor(balance, 'available')
   const reserved = balanceMinor(balance, 'reserved')
+  const recentReceipts = (summary?.recent_transactions ?? []).filter(isPixReceipt)
 
   return (
     <div className="page-stack">
@@ -77,14 +82,14 @@ export function HomePage() {
           <div className="balance-card-bottom">
             <div><span>Reservado</span><strong>{formatBRL(reserved)}</strong></div>
             <div className="balance-actions">
-              <Link className="button button-light" to="/transfers">Transferir</Link>
+              <Link className="button button-light" to="/transactions">Ver transações</Link>
               <Link className="button button-dark-quiet" to="/accounts">Ver contas</Link>
             </div>
           </div>
         </div>
 
-        <Metric label="Recebido · 7 dias" value={formatBRL(received)} detail="Operações concluídas" icon={<ArrowDownLeft size={16} />} />
-        <Metric label="Enviado · 7 dias" value={formatBRL(sent)} detail="Operações concluídas" icon={<ArrowUpRight size={16} />} />
+        <Metric label="Recebido · 7 dias" value={formatBRL(received)} detail="Pix concluídos" icon={<ArrowDownLeft size={16} />} />
+        <Metric label="Pagamentos · 7 dias" value={String(recent.length)} detail={`${succeeded.length} concluído(s)`} icon={<ReceiptText size={16} />} />
         <Metric label="Taxa de sucesso" value={`${successRate}%`} detail={`${attention.length} em acompanhamento`} />
       </section>
 
@@ -92,8 +97,8 @@ export function HomePage() {
         <section className="attention-banner">
           <div className="attention-icon"><CircleAlert size={18} /></div>
           <div>
-            <strong>{attention.length} operação(ões) precisam de acompanhamento</strong>
-            <span>Pendências e estados ambíguos devem ser investigados antes de qualquer nova tentativa.</span>
+            <strong>{attention.length} pagamento(s) precisam de acompanhamento</strong>
+            <span>Pendências e estados ambíguos devem ser reconciliados antes de considerar o recebimento concluído.</span>
           </div>
           <Link to="/transactions" className="button button-secondary">Revisar transações</Link>
         </section>
@@ -102,25 +107,22 @@ export function HomePage() {
       <section className="content-grid content-grid-main">
         <div className="panel">
           <div className="panel-header">
-            <div><h2>Movimentação recente</h2><p>Últimas operações da organização.</p></div>
-            <Link to="/transactions" className="text-link">Ver todas <ChevronRight size={14} /></Link>
+            <div><h2>Pagamentos recentes</h2><p>Últimos Pix recebidos nesta organização.</p></div>
+            <Link to="/transactions" className="text-link">Ver todos <ChevronRight size={14} /></Link>
           </div>
           <div className="table-wrap">
             <table className="data-table">
               <thead><tr><th>Transação</th><th>Status</th><th>Data</th><th className="align-right">Valor</th></tr></thead>
               <tbody>
-                {(summary?.recent_transactions ?? []).map((transaction) => {
-                  const incoming = transaction.direction === 'in' || transaction.kind === 'pix_in'
-                  return (
-                    <tr key={transaction.id}>
-                      <td><div className="transaction-primary"><span className={`direction-icon ${incoming ? 'incoming' : 'outgoing'}`}>{incoming ? <ArrowDownLeft size={15} /> : <ArrowUpRight size={15} />}</span><div><strong>{transactionLabel(transaction.kind)}</strong><span>{transaction.description || `ID ${transaction.id.slice(0, 10)}`}</span></div></div></td>
-                      <td><StatusBadge status={transaction.status} /></td>
-                      <td>{formatDateTime(transaction.created_at)}</td>
-                      <td className={`align-right money ${incoming ? 'money-positive' : ''}`}>{incoming ? '+' : '-'} {formatBRL(transaction.amount_minor)}</td>
-                    </tr>
-                  )
-                })}
-                {!summary?.recent_transactions?.length ? <tr><td colSpan={4}><div className="table-empty">Nenhuma movimentação ainda.</div></td></tr> : null}
+                {recentReceipts.map((transaction) => (
+                  <tr key={transaction.id}>
+                    <td><div className="transaction-primary"><span className="direction-icon incoming"><ArrowDownLeft size={15} /></span><div><strong>{transactionLabel(transaction.kind)}</strong><span>{transaction.description || `ID ${transaction.id.slice(0, 10)}`}</span></div></div></td>
+                    <td><StatusBadge status={transaction.status} /></td>
+                    <td>{formatDateTime(transaction.created_at)}</td>
+                    <td className="align-right money money-positive">+ {formatBRL(transaction.amount_minor)}</td>
+                  </tr>
+                ))}
+                {!recentReceipts.length ? <tr><td colSpan={4}><div className="table-empty">Nenhum pagamento Pix recebido ainda.</div></td></tr> : null}
               </tbody>
             </table>
           </div>
@@ -128,7 +130,7 @@ export function HomePage() {
 
         <aside className="panel connection-summary">
           <div className="panel-header">
-            <div><h2>Rotas de pagamento</h2><p>Infraestrutura real elegível para processar Pix.</p></div>
+            <div><h2>Rotas de recebimento</h2><p>Infraestrutura real elegível para processar Pix de entrada.</p></div>
             <Network size={18} />
           </div>
           <div className="connection-health-value"><strong>{activeConnections.length}</strong><span>ativa(s)</span></div>
