@@ -18,7 +18,6 @@ jobs:
           set -euo pipefail
           cat .bootstrap/part-* | base64 -d > /tmp/flashpag-src.txz
           xz -t /tmp/flashpag-src.txz
-          ls -lh /tmp/flashpag-src.txz
 
       - name: Extract source
         shell: bash
@@ -34,12 +33,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # GitHub App tokens cannot create/update workflow files. Keep the
+          # bootstrap workflow untouched and install ci.yml via the connector
+          # after the source commit lands.
           rm -rf .bootstrap
-          rm -f .github/workflows/bootstrap-source.yml
+          rm -f .github/workflows/ci.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
-          git status --short
           git diff --cached --check
           git commit -m 'feat: build minimal multi-provider Pix gateway'
 
