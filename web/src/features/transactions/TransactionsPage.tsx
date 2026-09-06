@@ -83,7 +83,7 @@ export function TransactionsPage() {
       <section className="toolbar">
         <div className="toolbar-copy">
           <strong>Pagamentos Pix</strong>
-          <span>Recebimentos dos clientes do merchant nesta organização.</span>
+          <span>Recebimentos Pix dos clientes desta organização.</span>
         </div>
 
         <div className="toolbar-right">
