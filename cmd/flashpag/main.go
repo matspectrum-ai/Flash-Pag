@@ -15,6 +15,7 @@ import (
 	"github.com/matspectrum-ai/Flash-Pag/internal/httpapi"
 	"github.com/matspectrum-ai/Flash-Pag/internal/provider"
 	providermock "github.com/matspectrum-ai/Flash-Pag/internal/provider/mock"
+	providerpixhub "github.com/matspectrum-ai/Flash-Pag/internal/provider/pixhub"
 	"github.com/matspectrum-ai/Flash-Pag/internal/supabase"
 	"github.com/matspectrum-ai/Flash-Pag/internal/webhook"
 )
@@ -35,7 +36,7 @@ func main() {
 			os.Exit(1)
 		}
 	}
-	providers := provider.NewRegistry(providermock.New())
+	providers := provider.NewRegistry(providermock.New(), providerpixhub.New())
 	app := httpapi.New(cfg, sb, box, providers, log)
 	srv := &http.Server{Addr: cfg.Addr, Handler: app.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 20 * time.Second, IdleTimeout: 60 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
