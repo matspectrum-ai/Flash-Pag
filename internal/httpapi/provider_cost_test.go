@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestProviderCostMinorRequiresExplicitMinorUnitEvidence(t *testing.T) {
+func TestProviderCostMinorRequiresVerifiedProviderContract(t *testing.T) {
 	tests := []struct {
 		name     string
 		provider string
@@ -13,11 +13,11 @@ func TestProviderCostMinorRequiresExplicitMinorUnitEvidence(t *testing.T) {
 		want     int64
 		known    bool
 	}{
-		{name: "mock", provider: "mock", payload: `null`, want: 0, known: true},
-		{name: "fee in cents", provider: "pixhub", payload: `{"data":{"feeInCents":37}}`, want: 37, known: true},
-		{name: "provider fee minor string", provider: "pixhub", payload: `{"provider_fee_minor":"12"}`, want: 12, known: true},
-		{name: "generic decimal fee is ignored", provider: "pixhub", payload: `{"fee":"0.37"}`, want: 0, known: false},
-		{name: "missing cost", provider: "pixhub", payload: `{"data":{"amount":1000}}`, want: 0, known: false},
+		{name: "mock is known zero cost", provider: "mock", payload: `null`, want: 0, known: true},
+		{name: "pixhub generic fee in cents is not a verified cost contract", provider: "pixhub", payload: `{"data":{"feeInCents":37}}`, want: 0, known: false},
+		{name: "pixhub provider fee looking field remains unverified", provider: "pixhub", payload: `{"provider_fee_minor":"12"}`, want: 0, known: false},
+		{name: "pixhub generic decimal fee is ignored", provider: "pixhub", payload: `{"fee":"0.37"}`, want: 0, known: false},
+		{name: "unknown provider stays unknown", provider: "other", payload: `{"costInCents":10}`, want: 0, known: false},
 	}
 
 	for _, test := range tests {
