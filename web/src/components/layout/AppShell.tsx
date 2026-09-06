@@ -14,6 +14,7 @@ import {
   Webhook,
 } from 'lucide-react'
 import { useSession } from '../../app/session'
+import { BrandMark } from '../brand/BrandMark'
 
 const navGroups = [
   {
@@ -72,7 +73,7 @@ export function AppShell() {
     <div className="app-shell">
       <aside className="sidebar">
         <div className="brand-lockup sidebar-brand">
-          <div className="brand-mark">F</div>
+          <BrandMark />
           <div>
             <strong>Flash Pag</strong>
             <span>Infraestrutura Pix</span>
@@ -105,7 +106,7 @@ export function AppShell() {
 
         <div className="sidebar-footer">
           <div className="session-summary">
-            <div className="avatar">{me?.user.email?.charAt(0).toUpperCase() || 'F'}</div>
+            <div className="avatar">{me?.user.email?.charAt(0).toUpperCase() || 'U'}</div>
             <div className="session-copy">
               <strong>{me?.user.email}</strong>
               <span>{me?.user.platform_admin ? 'Administrador da plataforma' : 'Membro'}</span>
