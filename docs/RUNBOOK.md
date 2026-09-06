@@ -1,0 +1,142 @@
+# Flash Pag — Runbook
+
+Operational guide for development, validation and deployment. This document is intentionally conservative because Flash Pag is a financial system.
+
+## Repository and branches
+
+Repository: `matspectrum-ai/Flash-Pag`.
+
+Stable production branch currently used by Railway `flash-pag`:
+- `feat/minimal-pix-gateway`
+
+Current Phase 3 development branch:
+- `feat/admin-finance-merchant-360`
+
+Previous React integration branch used by preview before Phase 3:
+- `feat/react-console`
+
+Do not move production to a development branch as part of normal phase validation.
+
+## Local verification
+
+Backend formatting and verification:
+
+```bash
+gofmt -w ./cmd ./internal
+go test ./...
+go vet ./...
+```
+
+Frontend verification:
+
+```bash
+cd web
+npm install --no-audit --no-fund
+npm run build
+```
+
+The frontend build runs TypeScript checking through the repository build script before Vite production bundling.
+
+Container-equivalent verification is also exercised by the Docker/Railway build, which builds the React bundle, runs Go tests and compiles the final Go binary.
+
+## CI gate
+
+Workflow: `.github/workflows/ci.yml`.
+
+Before promoting a development head to preview:
+1. Identify the exact branch head SHA.
+2. Confirm GitHub Actions/check status for that SHA.
+3. Do not treat a green status from an older SHA as validation of the current head.
+4. If CI fails, fix the branch first; do not work around the failure by deploying production.
+
+## Database changes
+
+For any new migration:
+1. Use the next numeric migration file; never edit an already-applied migration to change history.
+2. Apply to a disposable Supabase project/branch first.
+3. Run Supabase security/performance advisors.
+4. Exercise affected RPCs and invariants including success, duplicate/idempotent behavior, insufficient balance where applicable, invalid state transitions and authorization boundaries.
+5. Confirm backward compatibility with existing merchants/organizations or document an explicit migration strategy.
+6. Only after verification may a migration be considered ready for a real environment.
+
+Phase 3 currently intends to avoid a new migration unless required by a missing durable invariant.
+
+## Railway services
+
+Project: `Flash Pag Beta`.
+
+### Production
+
+Service: `flash-pag`.
+
+Expected source:
+- Repo: `matspectrum-ai/Flash-Pag`
+- Branch: `feat/minimal-pix-gateway`
+- Healthcheck: `/healthz`
+
+Production must remain unchanged while a development phase is being implemented or validated.
+
+### Development preview
+
+Service: `flash-pag-react-preview`.
+
+Expected Phase 3 source after CI gate:
+- Repo: `matspectrum-ai/Flash-Pag`
+- Branch: `feat/admin-finance-merchant-360`
+- Healthcheck: `/healthz`
+
+Read-only guards that must remain configured:
+- `APP_PREVIEW_READ_ONLY=true`
+- `VITE_PREVIEW_READ_ONLY=true`
+
+The preview can reference the same backing credentials/data required for visual validation only because mutations are blocked at both backend middleware and UI layers. Do not remove either guard during normal validation.
+
+## Preview promotion procedure
+
+1. Confirm the exact Phase 3 head SHA.
+2. Confirm CI is green for that SHA.
+3. Re-read `flash-pag` configuration and verify it still points at the stable production branch.
+4. Change only the source branch of `flash-pag-react-preview` to `feat/admin-finance-merchant-360`.
+5. Trigger/observe the preview deployment.
+6. Confirm Railway deployment reports the exact expected commit SHA.
+7. Confirm build success, including TypeScript/Vite build and Go tests.
+8. Confirm `/healthz` succeeds and reports preview read-only mode.
+9. Confirm the React app loads through `/app/` and the Phase 3 routes render.
+10. Confirm mutating application operations remain blocked in preview while session login/logout remains usable.
+11. Re-read `flash-pag` configuration after validation and confirm it was not changed.
+
+## Phase 3 visual/behavior checks
+
+Admin Financeiro:
+- Platform-admin only.
+- TPV uses successful `pix_in`; it is not Flash Pag revenue.
+- Revenue uses frozen `fee_minor`.
+- Provider cost shows only explicit trustworthy cost evidence.
+- Margin is absent/indisponível when provider-cost coverage is incomplete.
+- No metric is labeled net profit.
+- Global transaction surface does not mix Transferências or Saques into the Phase 3 Pix dashboard.
+
+Merchant 360°:
+- Platform-admin only.
+- Merchant identity/status visible.
+- All merchant Organizations represented.
+- KYC/KYB status and business details visible.
+- Current Pix pricing visible.
+- Members/roles visible.
+- Accounts and balances visible by Organization.
+- Customer counts and provider connections visible by Organization.
+- Recent Pix activity consolidated across Organizations.
+
+Merchant panel guardrails:
+- Do not add Transferências navigation/page back into the merchant product UI.
+- Do not add Saques UI until its dedicated phase.
+
+## Incident / rollback rule
+
+If preview validation fails:
+- Keep production unchanged.
+- Revert/fix the development branch or point the preview back to the last known-good development branch/commit.
+- Preserve evidence from CI/build/runtime logs.
+- Update `docs/PROJECT_STATE.md` if the failure changes the known project state or next action.
+
+If production ever requires rollback, treat it as a separate explicit production operation; do not infer approval from a preview task.
