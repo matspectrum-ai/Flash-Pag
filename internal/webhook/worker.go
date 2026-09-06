@@ -110,7 +110,7 @@ func (w *Worker) deliver(ctx context.Context, d delivery) {
 	io.Copy(io.Discard, io.LimitReader(resp.Body, 4096))
 	resp.Body.Close()
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		patch := map[string]any{"status": "succeeded", "last_status": resp.StatusCode, "last_error": nil, "delivered_at": time.Now().UTC().Format(time.RFC3339Nano)}
+		patch := map[string]any{"status": "succeeded", "last_status": resp.StatusCode, "last_error": nil, "locked_at": nil, "delivered_at": time.Now().UTC().Format(time.RFC3339Nano)}
 		q := url.Values{"id": {"eq." + d.ID}}
 		if err := w.sb.Do(ctx, http.MethodPatch, "/rest/v1/webhook_deliveries", q, patch, "", nil); err != nil {
 			w.log.Error("mark webhook success", "id", d.ID, "err", err)
@@ -122,7 +122,7 @@ func (w *Worker) deliver(ctx context.Context, d delivery) {
 
 func (w *Worker) fail(ctx context.Context, d delivery, status int, message string) {
 	delay := time.Duration(1<<min(d.AttemptCount, 10)) * time.Minute
-	patch := map[string]any{"status": "failed", "last_status": status, "last_error": message, "next_attempt_at": time.Now().Add(delay).UTC().Format(time.RFC3339Nano)}
+	patch := map[string]any{"status": "failed", "last_status": status, "last_error": message, "locked_at": nil, "next_attempt_at": time.Now().Add(delay).UTC().Format(time.RFC3339Nano)}
 	q := url.Values{"id": {"eq." + d.ID}}
 	if err := w.sb.Do(ctx, http.MethodPatch, "/rest/v1/webhook_deliveries", q, patch, "", nil); err != nil {
 		w.log.Error("mark webhook failure", "id", d.ID, "err", err)

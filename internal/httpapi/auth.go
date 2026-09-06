@@ -116,24 +116,39 @@ func consoleP(ctx context.Context) consolePrincipal {
 	return p
 }
 
-func (s *Server) authorizeOrganization(ctx context.Context, p consolePrincipal, orgID string) bool {
+func (s *Server) organizationRole(ctx context.Context, p consolePrincipal, orgID string) (string, bool) {
 	if orgID == "" {
-		return false
+		return "", false
 	}
 	if p.Admin {
-		return true
+		return "platform_admin", true
 	}
 	var orgs []struct {
 		MerchantID string `json:"merchant_id"`
 	}
 	if s.sb.Do(ctx, http.MethodGet, "/rest/v1/organizations", url.Values{"id": {"eq." + orgID}, "select": {"merchant_id"}, "limit": {"1"}}, nil, "", &orgs) != nil || len(orgs) != 1 {
-		return false
+		return "", false
 	}
 	var memberships []struct {
-		MerchantID string `json:"merchant_id"`
+		Role string `json:"role"`
 	}
-	q := url.Values{"merchant_id": {"eq." + orgs[0].MerchantID}, "user_id": {"eq." + p.UserID}, "select": {"merchant_id"}, "limit": {"1"}}
-	return s.sb.Do(ctx, http.MethodGet, "/rest/v1/merchant_users", q, nil, "", &memberships) == nil && len(memberships) == 1
+	q := url.Values{"merchant_id": {"eq." + orgs[0].MerchantID}, "user_id": {"eq." + p.UserID}, "select": {"role"}, "limit": {"1"}}
+	if s.sb.Do(ctx, http.MethodGet, "/rest/v1/merchant_users", q, nil, "", &memberships) != nil || len(memberships) != 1 {
+		return "", false
+	}
+	return memberships[0].Role, true
+}
+
+func roleAllowed(role string, allowed ...string) bool {
+	if role == "platform_admin" {
+		return true
+	}
+	for _, candidate := range allowed {
+		if role == candidate {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Server) organizationFromConsole(r *http.Request) (string, bool) {
@@ -141,8 +156,17 @@ func (s *Server) organizationFromConsole(r *http.Request) (string, bool) {
 	if orgID == "" {
 		orgID = r.Header.Get("X-Organization-Id")
 	}
-	p := consoleP(r.Context())
-	return orgID, s.authorizeOrganization(r.Context(), p, orgID)
+	_, ok := s.organizationRole(r.Context(), consoleP(r.Context()), orgID)
+	return orgID, ok
+}
+
+func (s *Server) organizationFromConsoleRoles(r *http.Request, allowed ...string) (string, bool) {
+	orgID := r.URL.Query().Get("organization_id")
+	if orgID == "" {
+		orgID = r.Header.Get("X-Organization-Id")
+	}
+	role, ok := s.organizationRole(r.Context(), consoleP(r.Context()), orgID)
+	return orgID, ok && roleAllowed(role, allowed...)
 }
 
 func parseLimit(v string) string {

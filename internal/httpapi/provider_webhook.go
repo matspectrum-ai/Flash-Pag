@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"time"
 )
 
 func (s *Server) providerWebhook(w http.ResponseWriter, r *http.Request) {
@@ -41,12 +42,34 @@ func (s *Server) providerWebhook(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 422, "invalid_event_status", "unsupported provider event status")
 		return
 	}
-	// Persist raw provider evidence. The unique provider event identity makes redelivery safe.
+	// Persist provider evidence before trusting it to mutate financial state. A redelivery
+	// that was already processed is acknowledged without producing another client event.
 	payload := evt.Raw
 	if len(payload) == 0 {
 		payload = json.RawMessage(body)
 	}
-	_ = s.sb.Do(r.Context(), http.MethodPost, "/rest/v1/provider_events", nil, map[string]any{"provider_connection_id": connectionID, "provider_event_id": evt.EventID, "payload": payload}, "resolution=ignore-duplicates", nil)
+	type providerEventRow struct {
+		ID          string  `json:"id"`
+		ProcessedAt *string `json:"processed_at"`
+	}
+	var evidence []providerEventRow
+	err = s.sb.Do(r.Context(), http.MethodPost, "/rest/v1/provider_events", nil, map[string]any{"provider_connection_id": connectionID, "provider_event_id": evt.EventID, "payload": payload}, "resolution=ignore-duplicates,return=representation", &evidence)
+	if err != nil {
+		writeError(w, 500, "provider_evidence_persist_failed", err.Error())
+		return
+	}
+	if len(evidence) == 0 {
+		q := url.Values{"provider_connection_id": {"eq." + connectionID}, "provider_event_id": {"eq." + evt.EventID}, "select": {"id,processed_at"}, "limit": {"1"}}
+		if err := s.sb.Do(r.Context(), http.MethodGet, "/rest/v1/provider_events", q, nil, "", &evidence); err != nil || len(evidence) != 1 {
+			writeError(w, 500, "provider_evidence_lookup_failed", "provider event evidence could not be loaded")
+			return
+		}
+		if evidence[0].ProcessedAt != nil {
+			writeJSON(w, 200, map[string]any{"received": true, "duplicate": true})
+			return
+		}
+	}
+	evidenceID := evidence[0].ID
 	tq := url.Values{"provider_connection_id": {"eq." + connectionID}, "provider_external_id": {"eq." + evt.ExternalID}, "select": {"id,organization_id,account_id,customer_id,provider_connection_id,provider_code,provider_external_id,kind,direction,status,amount_minor,currency,description,pix_key,qr_code,failure_code,failure_message,created_at,updated_at"}, "limit": {"1"}}
 	var txs []transaction
 	if err := s.sb.Do(r.Context(), http.MethodGet, "/rest/v1/transactions", tq, nil, "", &txs); err != nil || len(txs) != 1 {
@@ -70,5 +93,9 @@ func (s *Server) providerWebhook(w http.ResponseWriter, r *http.Request) {
 	}
 	tx, _ = s.fetchTransaction(r.Context(), tx.OrganizationID, tx.ID)
 	s.enqueueTransactionWebhook(r.Context(), tx)
+	if err := s.sb.Do(r.Context(), http.MethodPatch, "/rest/v1/provider_events", url.Values{"id": {"eq." + evidenceID}}, map[string]any{"processed_at": time.Now().UTC().Format(time.RFC3339Nano)}, "", nil); err != nil {
+		writeError(w, 500, "provider_evidence_finalize_failed", err.Error())
+		return
+	}
 	writeJSON(w, 200, map[string]any{"received": true})
 }

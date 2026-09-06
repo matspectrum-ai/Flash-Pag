@@ -110,7 +110,8 @@ create table public.transactions (
 );
 create index transactions_org_created_idx on public.transactions(organization_id, created_at desc);
 create index transactions_account_created_idx on public.transactions(account_id, created_at desc);
-create unique index transactions_provider_external_idx on public.transactions(provider_code, provider_external_id) where provider_external_id is not null;
+create unique index transactions_provider_connection_external_idx on public.transactions(provider_connection_id, provider_external_id) where provider_connection_id is not null and provider_external_id is not null;
+create unique index transactions_provider_external_without_connection_idx on public.transactions(provider_code, provider_external_id) where provider_connection_id is null and provider_external_id is not null;
 
 create table public.transaction_events (
   id uuid primary key default gen_random_uuid(),
@@ -127,6 +128,7 @@ create table public.provider_events (
   provider_event_id text not null,
   payload jsonb not null,
   received_at timestamptz not null default now(),
+  processed_at timestamptz,
   unique (provider_connection_id, provider_event_id)
 );
 
@@ -189,6 +191,7 @@ create table public.webhook_deliveries (
   next_attempt_at timestamptz not null default now(),
   last_status integer,
   last_error text,
+  locked_at timestamptz,
   delivered_at timestamptz,
   created_at timestamptz not null default now(),
   unique(endpoint_id, event_id)
@@ -367,11 +370,13 @@ begin
   return query
   with claimed as (
     select id from public.webhook_deliveries
-    where status in ('pending','failed') and next_attempt_at <= now() and attempt_count < 8
+    where ((status in ('pending','failed') and next_attempt_at <= now())
+        or (status='delivering' and locked_at < now() - interval '5 minutes'))
+      and attempt_count < 8
     order by next_attempt_at, created_at
     for update skip locked limit greatest(1,least(p_limit,100))
   ), upd as (
-    update public.webhook_deliveries d set status='delivering',attempt_count=d.attempt_count+1
+    update public.webhook_deliveries d set status='delivering',locked_at=now(),attempt_count=d.attempt_count+1
     from claimed where d.id=claimed.id returning d.*
   ) select * from upd;
 end $$;

@@ -115,7 +115,7 @@ func (s *Server) consoleList(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) consoleCreateCustomer(w http.ResponseWriter, r *http.Request) {
-	orgID, ok := s.organizationFromConsole(r)
+	orgID, ok := s.organizationFromConsoleRoles(r, "owner", "admin", "member")
 	if !ok {
 		writeError(w, 403, "organization_forbidden", "organization access denied")
 		return
@@ -134,7 +134,7 @@ func (s *Server) consoleCreateCustomer(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) consoleCreateAPIKey(w http.ResponseWriter, r *http.Request) {
-	orgID, ok := s.organizationFromConsole(r)
+	orgID, ok := s.organizationFromConsoleRoles(r, "owner", "admin")
 	if !ok {
 		writeError(w, 403, "organization_forbidden", "organization access denied")
 		return
@@ -178,7 +178,7 @@ func (s *Server) consoleCreateAPIKey(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) consoleCreateProviderConnection(w http.ResponseWriter, r *http.Request) {
-	orgID, ok := s.organizationFromConsole(r)
+	orgID, ok := s.organizationFromConsoleRoles(r, "owner", "admin")
 	if !ok {
 		writeError(w, 403, "organization_forbidden", "organization access denied")
 		return
@@ -229,7 +229,7 @@ func (s *Server) consoleCreateProviderConnection(w http.ResponseWriter, r *http.
 }
 
 func (s *Server) consoleCreateWebhook(w http.ResponseWriter, r *http.Request) {
-	orgID, ok := s.organizationFromConsole(r)
+	orgID, ok := s.organizationFromConsoleRoles(r, "owner", "admin")
 	if !ok {
 		writeError(w, 403, "organization_forbidden", "organization access denied")
 		return
@@ -255,7 +255,7 @@ func (s *Server) consoleCreateWithdrawal(w http.ResponseWriter, r *http.Request)
 	s.consoleOutbound(w, r, "withdrawal")
 }
 func (s *Server) consoleOutbound(w http.ResponseWriter, r *http.Request, kind string) {
-	orgID, ok := s.organizationFromConsole(r)
+	orgID, ok := s.organizationFromConsoleRoles(r, "owner", "admin")
 	if !ok {
 		writeError(w, 403, "organization_forbidden", "organization access denied")
 		return
