@@ -7,8 +7,8 @@ import (
 )
 
 type pricingRuleInput struct {
-	FixedMinor   int64  `json:"fixed_minor"`
-	PercentBPS   int    `json:"percent_bps"`
+	FixedMinor  int64  `json:"fixed_minor"`
+	PercentBPS  int    `json:"percent_bps"`
 	MinFeeMinor *int64 `json:"min_fee_minor"`
 	MaxFeeMinor *int64 `json:"max_fee_minor"`
 }
@@ -115,9 +115,9 @@ func (s *Server) consolePricedTransactions(w http.ResponseWriter, r *http.Reques
 	}
 	q := url.Values{
 		"organization_id": {"eq." + orgID},
-		"select": {"id,account_id,customer_id,provider_connection_id,provider_code,provider_external_id,kind,direction,status,amount_minor,fee_minor,pricing_version_id,pricing_version,currency,description,pix_key,failure_code,failure_message,created_at,updated_at"},
-		"order":  {"created_at.desc"},
-		"limit":  {"100"},
+		"select":          {"id,account_id,customer_id,provider_connection_id,provider_code,provider_external_id,kind,direction,status,amount_minor,fee_minor,pricing_version_id,pricing_version,currency,description,pix_key,failure_code,failure_message,created_at,updated_at"},
+		"order":           {"created_at.desc"},
+		"limit":           {"100"},
 	}
 	var rows []map[string]any
 	if err := s.sb.Do(r.Context(), http.MethodGet, "/rest/v1/transactions", q, nil, "", &rows); err != nil {
