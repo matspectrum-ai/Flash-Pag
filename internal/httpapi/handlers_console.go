@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/matspectrum-ai/Flash-Pag/internal/id"
+	"github.com/matspectrum-ai/Flash-Pag/internal/provider"
 )
 
 func (s *Server) login(w http.ResponseWriter, r *http.Request) {
@@ -245,6 +246,49 @@ func (s *Server) consoleCreateProviderConnection(w http.ResponseWriter, r *http.
 	}
 	delete(rows[0], "credentials_ciphertext")
 	writeJSON(w, 201, rows[0])
+}
+
+func (s *Server) consoleTestProviderConnection(w http.ResponseWriter, r *http.Request) {
+	orgID, ok := s.organizationFromConsoleRoles(r, "owner", "admin")
+	if !ok {
+		writeError(w, 403, "organization_forbidden", "organization access denied")
+		return
+	}
+	connectionID := strings.TrimSpace(r.PathValue("id"))
+	if connectionID == "" {
+		writeError(w, 400, "connection_required", "provider connection id is required")
+		return
+	}
+	q := url.Values{"id": {"eq." + connectionID}, "organization_id": {"eq." + orgID}, "status": {"eq.active"}, "select": {"id,provider_code"}, "limit": {"1"}}
+	var rows []struct {
+		ID           string `json:"id"`
+		ProviderCode string `json:"provider_code"`
+	}
+	if err := s.sb.Do(r.Context(), http.MethodGet, "/rest/v1/provider_connections", q, nil, "", &rows); err != nil || len(rows) != 1 {
+		writeError(w, 404, "connection_not_found", "active provider connection not found")
+		return
+	}
+	impl, exists := s.providers.Get(rows[0].ProviderCode)
+	if !exists {
+		writeError(w, 422, "provider_not_installed", "provider adapter is not installed")
+		return
+	}
+	tester, exists := impl.(provider.ConnectionTester)
+	if !exists {
+		writeError(w, 422, "health_check_unsupported", "provider does not expose a read-only health check")
+		return
+	}
+	conn, err := s.providerConnection(r.Context(), orgID, rows[0].ProviderCode, connectionID)
+	if err != nil {
+		writeError(w, 422, "connection_load_failed", err.Error())
+		return
+	}
+	status, err := tester.CheckConnection(r.Context(), conn)
+	if err != nil {
+		writeError(w, 502, "provider_health_failed", err.Error())
+		return
+	}
+	writeJSON(w, 200, status)
 }
 
 func (s *Server) consoleCreateWebhook(w http.ResponseWriter, r *http.Request) {

@@ -214,3 +214,49 @@ func TestCreateChargeRejectsMissingCustomer(t *testing.T) {
 		t.Fatalf("expected final validation error, got %v", err)
 	}
 }
+
+func TestCheckConnection(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/api/auth":
+			_, _ = w.Write([]byte(`{"success":true,"token":"jwt-test","expiresIn":60000}`))
+		case "/api/v1/balance":
+			if r.Method != http.MethodGet {
+				t.Fatalf("method = %s", r.Method)
+			}
+			if r.Header.Get("Authorization") != "Bearer jwt-test" {
+				t.Fatal("missing bearer token")
+			}
+			_, _ = w.Write([]byte(`{"success":true,"data":{"pix":{"balance":"1250.00"},"pixBlocked":{"balance":"0.25"},"reserve":{"balance":"300.10"}}}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer server.Close()
+	p := NewWithClient(server.URL, server.Client())
+	status, err := p.CheckConnection(context.Background(), testConn(t, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !status.Healthy || status.Provider != "pixhub" || status.Currency != "BRL" {
+		t.Fatalf("status = %#v", status)
+	}
+	if status.AvailableMinor != 125000 || status.BlockedMinor != 25 || status.ReserveMinor != 30010 {
+		t.Fatalf("balances = %#v", status)
+	}
+}
+
+func TestDecimalBRLToMinor(t *testing.T) {
+	cases := map[string]int64{"0.00": 0, "1.00": 100, "10.5": 1050, "1250.00": 125000, "-0.25": -25}
+	for in, want := range cases {
+		got, err := decimalBRLToMinor(in)
+		if err != nil || got != want {
+			t.Fatalf("decimalBRLToMinor(%q) = %d, %v; want %d", in, got, err, want)
+		}
+	}
+	for _, in := range []string{"", "1.001", "abc", ".25"} {
+		if _, err := decimalBRLToMinor(in); err == nil {
+			t.Fatalf("decimalBRLToMinor(%q) should fail", in)
+		}
+	}
+}

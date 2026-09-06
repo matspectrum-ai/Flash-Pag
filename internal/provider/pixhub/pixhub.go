@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -57,6 +58,52 @@ func NewWithClient(baseURL string, client *http.Client) *Provider {
 }
 
 func (p *Provider) Code() string { return "pixhub" }
+
+func (p *Provider) CheckConnection(ctx context.Context, conn provider.Connection) (provider.ConnectionStatus, error) {
+	status, raw, err := p.request(ctx, conn, http.MethodGet, "/api/v1/balance", nil, "")
+	if err != nil {
+		return provider.ConnectionStatus{}, err
+	}
+	if status < 200 || status >= 300 {
+		return provider.ConnectionStatus{}, classifyHTTP(status, raw)
+	}
+	var out struct {
+		Success bool `json:"success"`
+		Data    struct {
+			Pix struct {
+				Balance string `json:"balance"`
+			} `json:"pix"`
+			PixBlocked struct {
+				Balance string `json:"balance"`
+			} `json:"pixBlocked"`
+			Reserve struct {
+				Balance string `json:"balance"`
+			} `json:"reserve"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return provider.ConnectionStatus{}, fmt.Errorf("pixhub decode balance response: %w", err)
+	}
+	if !out.Success {
+		return provider.ConnectionStatus{}, errors.New("pixhub balance response was unsuccessful")
+	}
+	available, err := decimalBRLToMinor(out.Data.Pix.Balance)
+	if err != nil {
+		return provider.ConnectionStatus{}, fmt.Errorf("pixhub available balance: %w", err)
+	}
+	blocked, err := decimalBRLToMinor(out.Data.PixBlocked.Balance)
+	if err != nil {
+		return provider.ConnectionStatus{}, fmt.Errorf("pixhub blocked balance: %w", err)
+	}
+	reserve, err := decimalBRLToMinor(out.Data.Reserve.Balance)
+	if err != nil {
+		return provider.ConnectionStatus{}, fmt.Errorf("pixhub reserve balance: %w", err)
+	}
+	return provider.ConnectionStatus{
+		Provider: "pixhub", Healthy: true, Currency: "BRL",
+		AvailableMinor: available, BlockedMinor: blocked, ReserveMinor: reserve,
+	}, nil
+}
 
 func (p *Provider) CreateCharge(ctx context.Context, conn provider.Connection, in provider.ChargeRequest) (provider.ChargeResult, error) {
 	if in.AmountMinor < 100 || strings.ToUpper(in.Currency) != "BRL" {
@@ -462,6 +509,48 @@ func webhookTransferStatus(event, status string) string {
 		return "failed"
 	}
 	return transferStatus(status)
+}
+
+func decimalBRLToMinor(value string) (int64, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0, errors.New("empty decimal amount")
+	}
+	negative := strings.HasPrefix(value, "-")
+	if negative {
+		value = strings.TrimPrefix(value, "-")
+	}
+	parts := strings.Split(value, ".")
+	if len(parts) > 2 || parts[0] == "" {
+		return 0, fmt.Errorf("invalid decimal amount %q", value)
+	}
+	whole, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid decimal amount %q", value)
+	}
+	fraction := "00"
+	if len(parts) == 2 {
+		switch len(parts[1]) {
+		case 1:
+			fraction = parts[1] + "0"
+		case 2:
+			fraction = parts[1]
+		default:
+			return 0, fmt.Errorf("invalid decimal amount %q", value)
+		}
+	}
+	cents, err := strconv.ParseInt(fraction, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid decimal amount %q", value)
+	}
+	if whole > (int64(^uint64(0)>>1)-cents)/100 {
+		return 0, errors.New("decimal amount overflows int64")
+	}
+	minor := whole*100 + cents
+	if negative {
+		minor = -minor
+	}
+	return minor, nil
 }
 
 func documentType(document string) string {

@@ -43,6 +43,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /console/api/customers", s.withConsoleAuth(s.consoleCreateCustomer))
 	s.mux.HandleFunc("POST /console/api/api-keys", s.withConsoleAuth(s.consoleCreateAPIKey))
 	s.mux.HandleFunc("POST /console/api/provider-connections", s.withConsoleAuth(s.consoleCreateProviderConnection))
+	s.mux.HandleFunc("POST /console/api/provider-connections/{id}/test", s.withConsoleAuth(s.consoleTestProviderConnection))
 	s.mux.HandleFunc("POST /console/api/webhook-endpoints", s.withConsoleAuth(s.consoleCreateWebhook))
 	s.mux.HandleFunc("POST /console/api/transfers", s.withConsoleAuth(s.consoleCreateTransfer))
 	s.mux.HandleFunc("POST /console/api/withdrawals", s.withConsoleAuth(s.consoleCreateWithdrawal))
