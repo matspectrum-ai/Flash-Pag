@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"bytes"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -67,6 +68,28 @@ func TestMerchantSlug(t *testing.T) {
 	}
 	if got := merchantSlug("***"); got != "merchant" {
 		t.Fatalf("unexpected fallback slug %q", got)
+	}
+}
+
+func TestProviderCodeFromRequestPreservesBody(t *testing.T) {
+	payload := `{"provider":"pixhub","amount_minor":500}`
+	req := httptest.NewRequest(http.MethodPost, "/v1/transfers", bytes.NewBufferString(payload))
+	if got := providerCodeFromRequest(req); got != "pixhub" {
+		t.Fatalf("got provider %q want pixhub", got)
+	}
+	replayed, err := io.ReadAll(req.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(replayed) != payload {
+		t.Fatalf("request body changed: %q", string(replayed))
+	}
+}
+
+func TestProviderCodeFromRequestDefaultsToMock(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/v1/transfers", bytes.NewBufferString(`{"amount_minor":500}`))
+	if got := providerCodeFromRequest(req); got != "mock" {
+		t.Fatalf("got provider %q want mock", got)
 	}
 }
 
