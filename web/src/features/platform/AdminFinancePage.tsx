@@ -85,6 +85,13 @@ export function AdminFinancePage() {
   const inventoryIncomplete = tenantsQuery.data?.complete === false
   const dataLimited = transactionQueries.some((query) => (query.data?.data.length ?? 0) >= 1000)
   const activeMerchants = merchants.filter((merchant) => merchant.status === 'active').length
+  const providerCostDisplay = isLoading
+    ? '…'
+    : finance.metrics.providerCostComplete
+      ? formatBRL(finance.metrics.providerCostMinor)
+      : finance.metrics.providerCostKnownCount > 0
+        ? `${formatBRL(finance.metrics.providerCostMinor)} confirmado`
+        : 'Indisponível'
 
   if (!platformAdmin) {
     return <div className="error-state"><CircleAlert size={22} /><strong>Acesso restrito à plataforma.</strong><span>O dashboard financeiro é exclusivo da administração Flash Pag.</span></div>
@@ -96,7 +103,7 @@ export function AdminFinancePage() {
         <div>
           <span className="eyebrow">Control plane financeiro</span>
           <h2>Visão financeira global</h2>
-          <p>TPV mede volume processado. Receita mede somente taxas Flash Pag. Custo de provider vem de evidência real do provider; margem só aparece quando essa cobertura é completa.</p>
+          <p>TPV mede volume processado. Receita mede somente taxas Flash Pag realizadas em Pix concluído. Custo de provider vem de evidência real do provider; margem só aparece quando essa cobertura é completa.</p>
         </div>
         <div className="admin-period-switch" aria-label="Período">
           {[7, 30, 90].map((period) => <button key={period} type="button" className={days === period ? 'active' : ''} onClick={() => setDays(period)}>{period}d</button>)}
@@ -109,8 +116,8 @@ export function AdminFinancePage() {
 
       <section className="admin-finance-metrics">
         <article className="metric-card admin-metric-card"><div className="metric-label"><Activity size={16} /><span>TPV · Pix recebido</span></div><strong>{isLoading ? '…' : formatBRL(finance.metrics.tpvMinor)}</strong><span className="metric-detail">Volume `pix_in` concluído em {days} dias</span></article>
-        <article className="metric-card admin-metric-card"><div className="metric-label"><CircleDollarSign size={16} /><span>Receita Flash Pag</span></div><strong>{isLoading ? '…' : formatBRL(finance.metrics.revenueMinor)}</strong><span className="metric-detail">Taxas efetivamente cobradas</span></article>
-        <article className="metric-card admin-metric-card"><div className="metric-label"><ReceiptText size={16} /><span>Custo provider confirmado</span></div><strong>{isLoading ? '…' : formatBRL(finance.metrics.providerCostMinor)}</strong><span className="metric-detail">{finance.metrics.providerCostComplete ? 'Cobertura completa' : `${finance.metrics.providerCostMissingCount} transação(ões) sem custo explícito`}</span></article>
+        <article className="metric-card admin-metric-card"><div className="metric-label"><CircleDollarSign size={16} /><span>Receita Flash Pag</span></div><strong>{isLoading ? '…' : formatBRL(finance.metrics.revenueMinor)}</strong><span className="metric-detail">Taxas realizadas em Pix concluído</span></article>
+        <article className="metric-card admin-metric-card"><div className="metric-label"><ReceiptText size={16} /><span>Custo provider confirmado</span></div><strong>{providerCostDisplay}</strong><span className="metric-detail">{finance.metrics.providerCostComplete ? 'Cobertura completa' : `${finance.metrics.providerCostKnownCount} com custo confirmado · ${finance.metrics.providerCostMissingCount} sem evidência`}</span></article>
         <article className="metric-card admin-metric-card"><div className="metric-label"><TrendingUp size={16} /><span>Margem</span></div><strong>{isLoading ? '…' : finance.metrics.marginMinor == null ? 'Indisponível' : formatBRL(finance.metrics.marginMinor)}</strong><span className="metric-detail">Receita − custo provider. Não representa lucro líquido.</span></article>
       </section>
 
@@ -122,7 +129,7 @@ export function AdminFinancePage() {
       </section>
 
       <section className="panel admin-chart-panel">
-        <div className="panel-header"><div><h2>TPV diário</h2><p>Volume de Pix recebido concluído no período selecionado.</p></div><span className="count-pill">{days} dias</span></div>
+        <div className="panel-header"><div><h2>TPV diário</h2><p>Volume de Pix recebido concluído por dia-calendário no horário de Brasília.</p></div><span className="count-pill">{days} dias</span></div>
         <div className="admin-bar-chart" role="img" aria-label="Gráfico de TPV diário">
           {finance.daily.map((point) => {
             const height = Math.max(3, Math.round((point.tpvMinor / maxDailyTPV) * 100))
@@ -154,13 +161,14 @@ export function AdminFinancePage() {
             <tbody>
               {recentTransactions.map(({ transaction, organization, merchant }) => {
                 const margin = transactionMarginMinor(transaction)
-                return <tr key={transaction.id}><td>{formatDateTime(transaction.created_at)}</td><td><strong>{merchant.name}</strong><span>{organization.name}</span></td><td><StatusBadge status={transaction.status} /></td><td>{formatBRL(transaction.amount_minor)}</td><td>{formatBRL(transaction.fee_minor ?? 0)}</td><td>{typeof transaction.provider_cost_minor === 'number' ? formatBRL(transaction.provider_cost_minor) : '—'}</td><td>{margin == null ? '—' : formatBRL(margin)}</td></tr>
+                const realizedRevenue = transaction.status === 'succeeded' ? formatBRL(transaction.fee_minor ?? 0) : '—'
+                return <tr key={transaction.id}><td>{formatDateTime(transaction.created_at)}</td><td><strong>{merchant.name}</strong><span>{organization.name}</span></td><td><StatusBadge status={transaction.status} /></td><td>{formatBRL(transaction.amount_minor)}</td><td>{realizedRevenue}</td><td>{typeof transaction.provider_cost_minor === 'number' ? formatBRL(transaction.provider_cost_minor) : '—'}</td><td>{margin == null ? '—' : formatBRL(margin)}</td></tr>
               })}
               {!recentTransactions.length && !isLoading ? <tr><td colSpan={7}><div className="empty-state compact-empty"><Activity size={22} /><strong>Nenhum Pix no período</strong><span>Não há `pix_in` para compor TPV e receita.</span></div></td></tr> : null}
             </tbody>
           </table>
         </div>
-        <div className="admin-finance-footnote">Status apresentados conforme evidência transacional. “{statusLabel('succeeded')}” entra no TPV; demais estados não entram no volume concluído.</div>
+        <div className="admin-finance-footnote">Datas financeiras usam o horário de Brasília. “{statusLabel('succeeded')}” entra no TPV e realiza receita; demais estados não entram no volume concluído.</div>
       </section>
     </div>
   )
