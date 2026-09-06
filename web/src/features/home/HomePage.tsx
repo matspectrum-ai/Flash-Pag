@@ -68,7 +68,7 @@ export function HomePage() {
   const balance = summary?.balance as unknown as Record<string, unknown> | undefined
   const available = balanceMinor(balance, 'available')
   const reserved = balanceMinor(balance, 'reserved')
-  const recentReceipts = (summary?.recent_transactions ?? []).filter(isPixReceipt)
+  const recentReceipts = receipts.slice(0, 8)
 
   return (
     <div className="page-stack">
