@@ -1,0 +1,57 @@
+import { Navigate, Route, Routes } from 'react-router-dom'
+import { AppShell } from '../components/layout/AppShell'
+import { LoginPage } from '../features/auth/LoginPage'
+import { HomePage } from '../features/home/HomePage'
+import { useSession } from './session'
+
+const labels: Record<string, string> = {
+  transactions: 'Transações',
+  transfers: 'Transferências',
+  accounts: 'Contas',
+  customers: 'Clientes',
+  'api-keys': 'API Keys',
+  webhooks: 'Webhooks',
+  docs: 'Documentação',
+  connections: 'Conexões',
+  organization: 'Organização',
+  platform: 'Plataforma',
+}
+
+function MigrationPlaceholder({ name }: { name: keyof typeof labels }) {
+  return (
+    <section className="panel migration-placeholder">
+      <span className="eyebrow">Migração React</span>
+      <h2>{labels[name]}</h2>
+      <p>Esta área está sendo reconstruída na nova arquitetura. O produto atual permanece disponível na branch estável até atingirmos paridade funcional.</p>
+    </section>
+  )
+}
+
+export function App() {
+  const { loading, authenticated } = useSession()
+
+  if (loading) {
+    return <main className="boot-screen"><div className="brand-mark">F</div><span>Carregando Flash Pag…</span></main>
+  }
+
+  if (!authenticated) return <LoginPage />
+
+  return (
+    <Routes>
+      <Route element={<AppShell />}>
+        <Route index element={<HomePage />} />
+        <Route path="transactions" element={<MigrationPlaceholder name="transactions" />} />
+        <Route path="transfers" element={<MigrationPlaceholder name="transfers" />} />
+        <Route path="accounts" element={<MigrationPlaceholder name="accounts" />} />
+        <Route path="customers" element={<MigrationPlaceholder name="customers" />} />
+        <Route path="api-keys" element={<MigrationPlaceholder name="api-keys" />} />
+        <Route path="webhooks" element={<MigrationPlaceholder name="webhooks" />} />
+        <Route path="docs" element={<MigrationPlaceholder name="docs" />} />
+        <Route path="connections" element={<MigrationPlaceholder name="connections" />} />
+        <Route path="organization" element={<MigrationPlaceholder name="organization" />} />
+        <Route path="platform" element={<MigrationPlaceholder name="platform" />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
+    </Routes>
+  )
+}
