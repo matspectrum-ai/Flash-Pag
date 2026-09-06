@@ -13,11 +13,20 @@ type Connection struct {
 	Credentials  json.RawMessage
 }
 
+type Customer struct {
+	Name     string `json:"name,omitempty"`
+	Email    string `json:"email,omitempty"`
+	Document string `json:"document,omitempty"`
+	Phone    string `json:"phone,omitempty"`
+}
+
 type ChargeRequest struct {
 	OperationID string
 	AmountMinor int64
 	Currency    string
 	Description string
+	Customer    *Customer
+	WebhookURL  string
 }
 
 type ChargeResult struct {
@@ -33,6 +42,7 @@ type TransferRequest struct {
 	Currency    string
 	PixKey      string
 	Description string
+	WebhookURL  string
 }
 
 type TransferResult struct {
