@@ -21,8 +21,17 @@ export function Merchant360Page() {
   const { merchantId = '' } = useParams()
   const { me } = useSession()
   const [days, setDays] = useState(30)
-  const merchant = (me?.merchants ?? []).find((item) => item.id === merchantId)
-  const organizations = (me?.organizations ?? []).filter((item) => item.merchant_id === merchantId)
+  const platformAdmin = Boolean(me?.user.platform_admin)
+  const tenantsQuery = useQuery({
+    queryKey: ['platform-tenants'],
+    queryFn: api.adminTenants,
+    enabled: platformAdmin,
+    staleTime: 30_000,
+  })
+  const tenantMerchants = platformAdmin ? (tenantsQuery.data?.merchants ?? []) : (me?.merchants ?? [])
+  const tenantOrganizations = platformAdmin ? (tenantsQuery.data?.organizations ?? []) : (me?.organizations ?? [])
+  const merchant = tenantMerchants.find((item) => item.id === merchantId)
+  const organizations = tenantOrganizations.filter((item) => item.merchant_id === merchantId)
 
   const transactionQueries = useQueries({
     queries: organizations.map((organization) => ({
@@ -63,17 +72,17 @@ export function Merchant360Page() {
   const kycQuery = useQuery({
     queryKey: ['merchant-360-kyc', merchantId],
     queryFn: () => api.adminKYCDetail(merchantId),
-    enabled: Boolean(merchantId && me?.user.platform_admin),
+    enabled: Boolean(merchantId && platformAdmin && merchant),
   })
   const pricingQuery = useQuery({
     queryKey: ['merchant-360-pricing', merchantId],
     queryFn: () => api.adminPricingDetail(merchantId),
-    enabled: Boolean(merchantId && me?.user.platform_admin),
+    enabled: Boolean(merchantId && platformAdmin && merchant),
   })
   const membersQuery = useQuery({
-    queryKey: ['merchant-360-members', organizations[0]?.id],
-    queryFn: () => api.members(organizations[0]!.id),
-    enabled: Boolean(organizations[0]?.id && me?.user.platform_admin),
+    queryKey: ['merchant-360-members', merchantId],
+    queryFn: () => api.adminMerchantMembers(merchantId),
+    enabled: Boolean(merchantId && platformAdmin && merchant),
   })
 
   const scoped = useMemo<ScopedTransaction[]>(() => {
@@ -96,14 +105,19 @@ export function Merchant360Page() {
   const pricingRules = (currentPricing?.rules ?? {}) as Record<string, PricingRule>
   const pixInRule = pricingRules.pix_in
   const members = (membersQuery.data?.data ?? []) as MerchantMember[]
-  const loading = transactionQueries.some((query) => query.isLoading) || summaryQueries.some((query) => query.isLoading)
+  const loading = tenantsQuery.isLoading || transactionQueries.some((query) => query.isLoading) || summaryQueries.some((query) => query.isLoading)
   const dataLimited = transactionQueries.some((query) => (query.data?.data.length ?? 0) >= 1000)
+  const inventoryIncomplete = tenantsQuery.data?.complete === false
+  const membersIncomplete = membersQuery.data?.complete === false
 
-  if (!me?.user.platform_admin) {
+  if (!platformAdmin) {
     return <div className="error-state"><CircleAlert size={22} /><strong>Acesso restrito à plataforma.</strong><span>Merchant 360° é exclusivo da administração Flash Pag.</span></div>
   }
+  if (tenantsQuery.isLoading) {
+    return <div className="empty-state compact-empty"><Store size={22} /><strong>Carregando Merchant 360°</strong><span>Recuperando o inventário administrativo completo.</span></div>
+  }
   if (!merchant) {
-    return <div className="error-state"><Store size={22} /><strong>Merchant não encontrado.</strong><span>O tenant informado não existe ou não está disponível nesta sessão.</span></div>
+    return <div className="error-state"><Store size={22} /><strong>{inventoryIncomplete ? 'Merchant fora da janela carregada.' : 'Merchant não encontrado.'}</strong><span>{inventoryIncomplete ? 'O inventário administrativo atingiu o limite de segurança; não é possível afirmar que o tenant não existe.' : 'O tenant informado não existe ou não está disponível nesta sessão.'}</span></div>
   }
 
   return (
@@ -116,7 +130,9 @@ export function Merchant360Page() {
         <div className="admin-period-switch" aria-label="Período"><span>Financeiro</span>{[7, 30, 90].map((period) => <button key={period} type="button" className={days === period ? 'active' : ''} onClick={() => setDays(period)}>{period}d</button>)}</div>
       </section>
 
+      {inventoryIncomplete ? <div className="attention-banner"><div className="attention-icon"><CircleAlert size={17} /></div><div><strong>Inventário administrativo truncado</strong><span>O merchant atual foi encontrado, mas a plataforma atingiu o limite global de segurança. Totais comparativos externos a este tenant podem estar incompletos.</span></div></div> : null}
       {dataLimited ? <div className="attention-banner"><div className="attention-icon"><CircleAlert size={17} /></div><div><strong>Janela de dados limitada</strong><span>Uma organização atingiu 1.000 transações carregadas. Os totais permanecem sinalizados como uma visão operacional, não fechamento contábil.</span></div></div> : null}
+      {membersIncomplete ? <div className="attention-banner"><div className="attention-icon"><CircleAlert size={17} /></div><div><strong>Lista de membros truncada</strong><span>O limite de segurança de membros do tenant foi atingido; a equipe exibida não deve ser tratada como completa.</span></div></div> : null}
 
       <section className="admin-finance-metrics">
         <article className="metric-card admin-metric-card"><div className="metric-label"><Activity size={16} /><span>TPV · Pix recebido</span></div><strong>{loading ? '…' : formatBRL(finance.metrics.tpvMinor)}</strong><span className="metric-detail">Volume concluído no período</span></article>
@@ -161,24 +177,25 @@ export function Merchant360Page() {
             return <article className="merchant-360-org-card" key={organization.id}>
               <div className="merchant-360-org-head"><span className="platform-tenant-icon"><Building2 size={17} /></span><div><strong>{organization.name}</strong><code>{organization.slug}</code></div><StatusBadge status={organization.status} /></div>
               <div className="merchant-360-org-balance"><span>Saldo disponível</span><strong>{summary ? formatBRL(balanceMinor(summary.balance as Record<string, unknown>, 'available')) : '—'}</strong><small>{summary ? `Reservado ${formatBRL(balanceMinor(summary.balance as Record<string, unknown>, 'reserved'))}` : 'Carregando saldo'}</small></div>
-              <div className="merchant-360-org-stats"><span><Landmark size={14} /><strong>{accounts.length}</strong><small>contas</small></span><span><Users size={14} /><strong>{customers.length}</strong><small>clientes</small></span><span><Network size={14} /><strong>{connections.length}</strong><small>conexões</small></span><span><Activity size={14} /><strong>{organizationTx.filter((item) => item.transaction.status === 'succeeded').length}</strong><small>Pix no período</small></span></div>
+              <div className="merchant-360-org-stats"><span><Landmark size={14} /><strong>{accounts.length}</strong><small>contas</small></span><span><Users size={14} /><strong>{customers.length}{customers.length >= 100 ? '+' : ''}</strong><small>clientes</small></span><span><Network size={14} /><strong>{connections.length}</strong><small>conexões</small></span><span><Activity size={14} /><strong>{organizationTx.filter((item) => item.transaction.status === 'succeeded').length}</strong><small>Pix no período</small></span></div>
               <div className="merchant-360-connection-list">{connections.slice(0, 3).map((connection) => <span key={connection.id}><strong>{connection.provider_code}</strong><small>{connection.label}</small><StatusBadge status={connection.status} /></span>)}{!connections.length ? <em>Sem provider conectado.</em> : null}</div>
             </article>
           })}
+          {!organizations.length ? <div className="empty-state compact-empty"><Building2 size={22} /><strong>Merchant sem organizações</strong><span>O Merchant 360° continua válido; não há contexto operacional por organização para exibir.</span></div> : null}
         </div>
       </section>
 
       <section className="panel">
-        <div className="panel-header"><div><h2>Equipe do merchant</h2><p>Membros e papéis compartilhados entre as organizações do tenant.</p></div><span className="count-pill">{members.length}</span></div>
+        <div className="panel-header"><div><h2>Equipe do merchant</h2><p>Membros e papéis do tenant, independente da existência de organizações.</p></div><span className="count-pill">{members.length}</span></div>
         <div className="merchant-360-members">
-          {members.map((member) => <article key={member.user_id}><span className="customer-avatar"><Users size={14} /></span><div><strong>{member.email}</strong><span className="mono">{member.user_id}</span></div><span>{roleLabel(member.role)}</span></article>)}
-          {!members.length && !membersQuery.isLoading ? <div className="empty-state compact-empty"><Users size={22} /><strong>Sem membros carregados</strong><span>Nenhum vínculo adicional foi retornado para este merchant.</span></div> : null}
+          {members.map((member) => <article key={member.user_id}><span className="customer-avatar"><Users size={14} /></span><div><strong>{member.email || member.user_id}</strong><span className="mono">{member.user_id}</span></div><span>{roleLabel(member.role)}</span></article>)}
+          {!members.length && !membersQuery.isLoading ? <div className="empty-state compact-empty"><Users size={22} /><strong>Sem membros carregados</strong><span>Nenhum vínculo de usuário foi retornado para este merchant.</span></div> : null}
         </div>
       </section>
 
       <section className="panel">
         <div className="panel-header"><div><h2>Pix recentes</h2><p>Visão consolidada das organizações. Transferências e saques não aparecem aqui.</p></div><span className="count-pill">{recentTransactions.length}</span></div>
-        <div className="table-wrap"><table className="data-table admin-finance-table"><thead><tr><th>Data</th><th>Organização</th><th>Status</th><th>TPV</th><th>Receita</th><th>Custo provider</th><th>Margem</th></tr></thead><tbody>{recentTransactions.map(({ transaction, organization }) => { const margin = transactionMarginMinor(transaction); return <tr key={transaction.id}><td>{formatDateTime(transaction.created_at)}</td><td><strong>{organization.name}</strong><span>{transaction.provider_code || '—'}</span></td><td><StatusBadge status={transaction.status} /></td><td>{formatBRL(transaction.amount_minor)}</td><td>{formatBRL(transaction.fee_minor ?? 0)}</td><td>{typeof transaction.provider_cost_minor === 'number' ? formatBRL(transaction.provider_cost_minor) : '—'}</td><td>{margin == null ? '—' : formatBRL(margin)}</td></tr> })}</tbody></table></div>
+        <div className="table-wrap"><table className="data-table admin-finance-table"><thead><tr><th>Data</th><th>Organização</th><th>Status</th><th>Valor</th><th>Receita</th><th>Custo provider</th><th>Margem</th></tr></thead><tbody>{recentTransactions.map(({ transaction, organization }) => { const margin = transactionMarginMinor(transaction); return <tr key={transaction.id}><td>{formatDateTime(transaction.created_at)}</td><td><strong>{organization.name}</strong><span>{transaction.provider_code || '—'}</span></td><td><StatusBadge status={transaction.status} /></td><td>{formatBRL(transaction.amount_minor)}</td><td>{formatBRL(transaction.fee_minor ?? 0)}</td><td>{typeof transaction.provider_cost_minor === 'number' ? formatBRL(transaction.provider_cost_minor) : '—'}</td><td>{margin == null ? '—' : formatBRL(margin)}</td></tr> })}</tbody></table></div>
       </section>
     </div>
   )
