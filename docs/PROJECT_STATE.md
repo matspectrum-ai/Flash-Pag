@@ -12,7 +12,7 @@ Last reconciled from the repository, GitHub CI and Railway preview: 2026-09-06.
 
 The Phase 3 branch was explicitly reconstructed after an earlier execution timeout instead of assuming interrupted work had persisted. The first recovered implementation head was `9f0cac522be4735f0a5028b8d49dba1a1f65ddef`. Subsequent work added Financeiro/Merchant 360°, strict provider-cost semantics, permanent project documentation and read-only preview validation.
 
-The latest code checkpoint before this documentation update is `395da84d539579d647c37b23cba98104fbc62c46`. It hardens Phase 3 against silent tenant truncation, handles Merchant membership without requiring an Organization and uses exact Organization counts instead of bounded array lengths.
+The latest code checkpoint before the current deployment-validation pass is `6ca3bd1550b60b5307eddb531bf9fe9ba0b63c55`. It preserves bounded session bootstrap behavior while keeping the dedicated admin tenant inventory responsible for complete platform-wide reads. The parent checkpoint `1a2ca1753b724aaa2682d8b3e3d9b51acedcb2b8` was fully built and smoke-tested on Railway and Render.
 
 Phase 3 remains IN PROGRESS. Technical gates can be satisfied without declaring product acceptance; authenticated visual/product review remains a separate acceptance step.
 
@@ -32,10 +32,23 @@ Development preview:
 - Source repo: `matspectrum-ai/Flash-Pag`.
 - Source branch: `feat/admin-finance-merchant-360`.
 - Preview is protected by `APP_PREVIEW_READ_ONLY` and `VITE_PREVIEW_READ_ONLY`.
-- Last fully validated preview deployment before the latest read-contract hardening: `a176782f-224b-42c7-92c6-5a1121b2d306` at commit `8e158676d2e4a7dd4f2fac5c5a1a087567ecb541`.
-- That deployment passed Railway build/tests and `/healthz`, and runtime probes confirmed `preview_read_only:true`, HTTP 423 for a harmless mutating POST, and SPA fallback for `/app/`, Financeiro and Merchant 360° routes.
+- Fully validated Railway deployment `5720e297-0a78-470d-9388-f200b84d8cc3` serves commit `1a2ca1753b724aaa2682d8b3e3d9b51acedcb2b8`.
+- External runtime probes confirmed `preview_read_only:true`, HTTP 423 for a harmless mutating POST, and SPA fallback for `/app/`, Financeiro and Merchant 360° routes.
 
-The newer documentation head must pass exact-head CI and be deployed to this preview before the next technical checkpoint is reported. Production must not be moved.
+The active branch is one code commit ahead of that validated runtime snapshot. This documentation update intentionally creates a fresh branch event so Railway branch tracking can be revalidated against the exact current head. Production must not be moved.
+
+## Platform portability benchmark
+
+An isolated Render benchmark was created in Virginia using the exact validated commit `1a2ca1753b724aaa2682d8b3e3d9b51acedcb2b8`, with auto-deploy disabled and read-only preview flags enabled. It is not a production candidate and does not carry live Supabase secrets.
+
+A GitHub-hosted Central US probe compared the public Railway and Render previews using the same endpoint sequence:
+- `/healthz` returned HTTP 200 and `preview_read_only:true` on both platforms.
+- `/app/`, `/app/platform/finance`, and a Merchant 360° SPA route returned HTTP 200 on both platforms.
+- A harmless POST to `/console/register` was rejected with HTTP 423 `preview_read_only` on both platforms.
+- Observed warm request latency was broadly similar: Railway approximately 0.11–0.14 s and Render approximately 0.10–0.18 s from that runner.
+- Railway remains the preferred host for the current phase because it is already the validated operating environment and the benchmark showed no material advantage that justifies migration risk during Phase 3.
+
+The application remains portable: stateless Go HTTP service, embedded React/Vite assets and external Supabase state mean there is no hard platform lock-in.
 
 ## Implemented architecture
 
@@ -112,7 +125,7 @@ Product guardrails:
 
 ## Verification state
 
-Code checkpoint `395da84d539579d647c37b23cba98104fbc62c46` passed the substantive GitHub CI stages:
+Code checkpoint `6ca3bd1550b60b5307eddb531bf9fe9ba0b63c55` passed GitHub CI, including:
 - `gofmt -w ./cmd ./internal && git diff --exit-code`
 - web dependency install
 - TypeScript typecheck
@@ -120,12 +133,12 @@ Code checkpoint `395da84d539579d647c37b23cba98104fbc62c46` passed the substantiv
 - `go test ./...`
 - `go vet ./...`
 
-The new permanent-documentation commits create a newer branch head, so exact-head CI and Railway preview validation are still required before reporting a new fully validated checkpoint.
+The documentation update after that code checkpoint creates a newer branch head. Exact-head CI and Railway preview validation remain required before reporting a new fully validated checkpoint.
 
 ## Current risks / next Phase 3 work
 
 - Pixhub has no verified provider-cost contract; cost and dependent margin intentionally remain unavailable rather than estimated.
 - Per-Organization transaction reads remain capped at 1,000 rows and the UI flags truncation. At larger measured scale, a server-side financial read model may be justified.
 - Tenant inventory has an explicit 10,000-row safety ceiling and reports incompleteness rather than silently truncating.
-- Authenticated visual/product acceptance of Financeiro and Merchant 360° has not been automated in the current session because no connected browser/admin session is available.
+- Authenticated visual/product acceptance of Financeiro and Merchant 360° has not been automated in the current session because the Opera Browser Connector is currently disconnected.
 - Refund/reversal compensating ledger journals remain pending hardening outside the primary Phase 3 scope.
