@@ -1,14 +1,15 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from '../components/layout/AppShell'
+import { BrandMark } from '../components/brand/BrandMark'
 import { LoginPage } from '../features/auth/LoginPage'
 import { ConnectionsPage } from '../features/connections/ConnectionsPage'
 import { HomePage } from '../features/home/HomePage'
+import { TransactionsPage } from '../features/transactions/TransactionsPage'
+import { TransfersPage } from '../features/transfers/TransfersPage'
+import { AccountsPage } from '../features/accounts/AccountsPage'
 import { useSession } from './session'
 
 const labels: Record<string, string> = {
-  transactions: 'Transações',
-  transfers: 'Transferências',
-  accounts: 'Contas',
   customers: 'Clientes',
   'api-keys': 'API Keys',
   webhooks: 'Webhooks',
@@ -31,7 +32,12 @@ export function App() {
   const { loading, authenticated } = useSession()
 
   if (loading) {
-    return <main className="boot-screen"><div className="brand-mark">F</div><span>Carregando Flash Pag…</span></main>
+    return (
+      <main className="boot-screen">
+        <BrandMark className="brand-mark-large" />
+        <div><strong>Flash Pag</strong><span>Carregando sua operação…</span></div>
+      </main>
+    )
   }
 
   if (!authenticated) return <LoginPage />
@@ -40,9 +46,9 @@ export function App() {
     <Routes>
       <Route element={<AppShell />}>
         <Route index element={<HomePage />} />
-        <Route path="transactions" element={<MigrationPlaceholder name="transactions" />} />
-        <Route path="transfers" element={<MigrationPlaceholder name="transfers" />} />
-        <Route path="accounts" element={<MigrationPlaceholder name="accounts" />} />
+        <Route path="transactions" element={<TransactionsPage />} />
+        <Route path="transfers" element={<TransfersPage />} />
+        <Route path="accounts" element={<AccountsPage />} />
         <Route path="customers" element={<MigrationPlaceholder name="customers" />} />
         <Route path="api-keys" element={<MigrationPlaceholder name="api-keys" />} />
         <Route path="webhooks" element={<MigrationPlaceholder name="webhooks" />} />
