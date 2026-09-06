@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 
 	"github.com/matspectrum-ai/Flash-Pag/internal/id"
@@ -43,38 +42,8 @@ func (s *Server) consoleMe(w http.ResponseWriter, r *http.Request) {
 	var merchants []map[string]any
 	var orgs []map[string]any
 	if p.Admin {
-		loadAll := func(path, selectFields, order string) ([]map[string]any, error) {
-			const pageSize = 1000
-			rows := make([]map[string]any, 0, pageSize)
-			for offset := 0; ; offset += pageSize {
-				var page []map[string]any
-				q := url.Values{
-					"select": {selectFields},
-					"order":  {order},
-					"limit":  {strconv.Itoa(pageSize)},
-					"offset": {strconv.Itoa(offset)},
-				}
-				if err := s.sb.Do(r.Context(), http.MethodGet, path, q, nil, "", &page); err != nil {
-					return nil, err
-				}
-				rows = append(rows, page...)
-				if len(page) < pageSize {
-					return rows, nil
-				}
-			}
-		}
-
-		var err error
-		merchants, err = loadAll("/rest/v1/merchants", "id,name,status,created_at", "created_at.desc,id.desc")
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "merchant_catalog_load_failed", "platform merchant catalog could not be loaded")
-			return
-		}
-		orgs, err = loadAll("/rest/v1/organizations", "id,merchant_id,name,slug,status,created_at", "created_at.desc,id.desc")
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "organization_catalog_load_failed", "platform organization catalog could not be loaded")
-			return
-		}
+		_ = s.sb.Do(r.Context(), http.MethodGet, "/rest/v1/merchants", url.Values{"select": {"id,name,status,created_at"}, "order": {"created_at.desc"}, "limit": {"100"}}, nil, "", &merchants)
+		_ = s.sb.Do(r.Context(), http.MethodGet, "/rest/v1/organizations", url.Values{"select": {"id,merchant_id,name,slug,status,created_at"}, "order": {"created_at.desc"}, "limit": {"200"}}, nil, "", &orgs)
 	} else {
 		var memberships []struct {
 			MerchantID string `json:"merchant_id"`
