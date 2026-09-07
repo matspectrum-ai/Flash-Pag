@@ -119,3 +119,28 @@ Status: ACCEPTED.
 Admin Financeiro and Merchant 360° period filters and daily financial buckets use `America/Sao_Paulo` as the business timezone. Browser-local timezone and raw UTC calendar dates must not independently determine 7/30/90-day membership or daily TPV buckets.
 
 This keeps the same Pix near midnight in the same reporting day for every platform administrator regardless of where their browser is running.
+
+## D-016 — Platform admin is Organization-centric; Merchant is an internal boundary
+
+Status: ACCEPTED.
+
+The database/domain `Merchant` remains the durable commercial tenant boundary for membership, KYC/KYB and pricing. It is not a first-class platform-admin navigation concept.
+
+Platform operators manage Organizations/Commercial Accounts. The admin UI may resolve `organization.merchant_id` internally to call merchant-scoped contracts, but must not require an operator to create or understand a Merchant separately from the Organization being provisioned.
+
+The platform provisioning UX exposes one `New organization` action. Backend orchestration creates the internal Merchant boundary, optional owner membership, Organization and default BRL account; existing Merchant triggers initialize KYC and pricing.
+
+This is an information-architecture/application-layer decision, not a schema rename. Existing tenant invariants and foreign keys remain intact.
+
+
+## D-017 — Platform Organization provisioning is atomic in PostgreSQL
+
+Status: ACCEPTED.
+
+The single platform-admin `New organization` action is a durable provisioning operation, not a sequence of independently committed HTTP writes.
+
+Migration `0010_platform_organization_provisioning.sql` provides service-role RPC `provision_platform_organization`. The RPC creates the internal Merchant boundary, optional owner membership, Organization and principal BRL account inside one PostgreSQL transaction. Existing Merchant insert triggers initialize KYC and pricing in the same transaction.
+
+If any step fails, PostgreSQL rolls the whole operation back. Application-layer compensating deletion is not considered a sufficient invariant because pricing history uses restrictive/immutable relationships that may make best-effort deletion incomplete or impossible.
+
+The RPC is not applied directly to production during development. It must be applied and exercised first in the writable staging environment before the Phase 4 provisioning UI is enabled for real writes.

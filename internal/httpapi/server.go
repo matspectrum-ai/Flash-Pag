@@ -96,6 +96,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /console/api/admin/pricing/{merchantID}", s.withAdmin(s.adminSetPricing))
 	s.mux.HandleFunc("POST /console/api/admin/merchants", s.withAdmin(s.adminCreateMerchantWithKYC))
 	s.mux.HandleFunc("POST /console/api/admin/organizations", s.withAdmin(s.adminCreateOrganization))
+	s.mux.HandleFunc("POST /console/api/admin/organizations/provision", s.withAdmin(s.adminProvisionOrganization))
 	s.mux.HandleFunc("POST /console/api/admin/members", s.withAdmin(s.adminAddMember))
 
 	s.mux.HandleFunc("GET /v1/balance", s.withAPIScope("balance:read", s.getBalance))

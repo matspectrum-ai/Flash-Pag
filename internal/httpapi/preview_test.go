@@ -57,3 +57,22 @@ func TestPreviewReadOnlyAllowsReadAndSessionLifecycle(t *testing.T) {
 		})
 	}
 }
+
+func TestPreviewReadOnlyBlocksPlatformOrganizationProvisioning(t *testing.T) {
+	called := false
+	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusCreated)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/console/api/admin/organizations/provision", nil)
+	rr := httptest.NewRecorder()
+	previewReadOnly(true, next).ServeHTTP(rr, req)
+
+	if called {
+		t.Fatal("provisioning handler was called in read-only preview")
+	}
+	if rr.Code != http.StatusLocked {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusLocked)
+	}
+}

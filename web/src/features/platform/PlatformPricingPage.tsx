@@ -45,7 +45,7 @@ type RuleForm = {
 type PricingForm = Record<PricingOperation, RuleForm>
 
 const operations: { key: PricingOperation; label: string; description: string }[] = [
-  { key: 'pix_in', label: 'Pix recebido', description: 'Descontada do valor bruto antes do crédito no saldo do Merchant.' },
+  { key: 'pix_in', label: 'Pix recebido', description: 'Descontada do valor bruto antes do crédito no saldo da organização.' },
   { key: 'transfer', label: 'Transferência Pix', description: 'Somada ao valor enviado e debitada do saldo no mesmo fluxo financeiro.' },
   { key: 'withdrawal', label: 'Saque', description: 'Somada ao valor do saque e reconhecida somente quando a operação conclui.' },
 ]
@@ -133,8 +133,16 @@ export function PlatformPricingPage() {
   const { me } = useSession()
   const queryClient = useQueryClient()
   const previewReadOnly = import.meta.env.VITE_PREVIEW_READ_ONLY === 'true'
-  const merchants = me?.merchants ?? []
-  const [merchantId, setMerchantId] = useState(merchants[0]?.id ?? '')
+  const tenantsQuery = useQuery({
+    queryKey: ['platform-tenants'],
+    queryFn: api.adminTenants,
+    enabled: Boolean(me?.user.platform_admin),
+    staleTime: 30_000,
+  })
+  const organizations = tenantsQuery.data?.organizations ?? []
+  const [organizationId, setOrganizationId] = useState('')
+  const selectedOrganization = organizations.find((organization) => organization.id === organizationId)
+  const merchantId = selectedOrganization?.merchant_id ?? ''
   const [form, setForm] = useState<PricingForm>(emptyForm)
   const [note, setNote] = useState('')
   const [formError, setFormError] = useState('')
@@ -143,8 +151,9 @@ export function PlatformPricingPage() {
   const [simulatorAmount, setSimulatorAmount] = useState('100,00')
 
   useEffect(() => {
-    if (!merchantId && merchants[0]?.id) setMerchantId(merchants[0].id)
-  }, [merchantId, merchants])
+    if (!organizationId && organizations[0]?.id) setOrganizationId(organizations[0].id)
+    if (organizationId && !organizations.some((organization) => organization.id === organizationId)) setOrganizationId(organizations[0]?.id ?? '')
+  }, [organizationId, organizations])
 
   const pricingQuery = useQuery({
     queryKey: ['admin-pricing', merchantId],
@@ -218,24 +227,27 @@ export function PlatformPricingPage() {
     return <div className="error-state"><ShieldCheck size={22} /><strong>Acesso restrito à plataforma.</strong><span>Somente administradores da Flash Pag podem alterar pricing.</span></div>
   }
 
-  if (!merchants.length) {
-    return <div className="empty-state"><DollarSign size={24} /><strong>Nenhum Merchant disponível</strong><span>Crie um Merchant antes de configurar taxas.</span></div>
+  if (tenantsQuery.isLoading) return <div className="skeleton skeleton-panel" aria-busy="true" />
+  if (tenantsQuery.isError) return <div className="error-state"><CircleAlert size={22} /><strong>Não foi possível carregar as organizações.</strong><span>O seletor de pricing depende do inventário administrativo.</span></div>
+  if (!organizations.length) {
+    return <div className="empty-state"><DollarSign size={24} /><strong>Nenhuma organização disponível</strong><span>Crie uma organização antes de configurar taxas.</span></div>
   }
 
   const current = pricingQuery.data?.current
 
   return (
     <div className="page-stack pricing-page">
+      {tenantsQuery.data?.complete === false ? <div className="attention-banner"><div className="attention-icon"><CircleAlert size={17} /></div><div><strong>Inventário parcial</strong><span>O limite de segurança do inventário foi atingido; o seletor pode não conter todas as organizações.</span></div></div> : null}
       <section className="pricing-context panel">
         <div>
           <span className="eyebrow">Política comercial</span>
-          <h2>Taxas por Merchant</h2>
+          <h2>Taxas por organização</h2>
           <p>Cada alteração cria uma versão imutável. A versão de uma transação é congelada no momento em que ela nasce.</p>
         </div>
         <label className="pricing-merchant-select">
-          <span>Merchant</span>
-          <select value={merchantId} onChange={(event) => setMerchantId(event.target.value)}>
-            {merchants.map((merchant) => <option key={merchant.id} value={merchant.id}>{merchant.name}</option>)}
+          <span>Organização</span>
+          <select value={organizationId} onChange={(event) => setOrganizationId(event.target.value)}>
+            {organizations.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}
           </select>
         </label>
       </section>
@@ -251,7 +263,7 @@ export function PlatformPricingPage() {
             <div><span>Versão ativa</span><strong>v{current.version}</strong></div>
             <div><span>Moeda</span><strong>{current.currency}</strong></div>
             <div><span>Ativada em</span><strong>{formatDateTime(current.updated_at || current.created_at)}</strong></div>
-            <div><span>Modelo</span><strong>Merchant-wide</strong></div>
+            <div><span>Modelo</span><strong>Conta comercial</strong></div>
           </section>
 
           <section className="pricing-rule-grid">

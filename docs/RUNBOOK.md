@@ -9,8 +9,11 @@ Repository: `matspectrum-ai/Flash-Pag`.
 Stable production branch currently used by Railway `flash-pag`:
 - `feat/minimal-pix-gateway`
 
-Current Phase 3 development branch:
+Completed Phase 3 branch:
 - `feat/admin-finance-merchant-360`
+
+Current Phase 4 development branch:
+- `feat/platform-admin-organizations`
 
 Previous React integration branch used by preview before Phase 3:
 - `feat/react-console`
@@ -60,7 +63,7 @@ For any new migration:
 5. Confirm backward compatibility with existing merchants/organizations or document an explicit migration strategy.
 6. Only after verification may a migration be considered ready for a real environment.
 
-Phase 3 currently requires no new migration. Its additional admin completeness logic is implemented as read-only contracts over existing tables/RPCs.
+Phase 3 required no new migration. Phase 4 adds `0010_platform_organization_provisioning.sql` only for the durable atomic-provisioning invariant. The Organization-centric information architecture remains an application-layer refactor over the existing tenant model; the new RPC must be applied and tested in staging before any writable Phase 4 environment is enabled.
 
 ## Railway services
 
@@ -185,6 +188,32 @@ Accepted behavior included:
 - Exact preview authentication staying on the isolated domain after setting its own `APP_PUBLIC_URL`.
 
 Do not fabricate non-admin identities or induce destructive business failures only to repeat acceptance. Authorization/error-state guarantees should be exercised by tests and safe runtime boundary probes unless a legitimate test identity/state already exists.
+
+## Phase 4 platform-admin checks
+
+Information architecture:
+- `/platform` is Dashboard.
+- `/platform/organizations` is the tenant directory.
+- `/platform/organizations/{organizationID}` is Organization 360°.
+- `/platform/users`, `/platform/transactions`, `/platform/balances` and `/platform/processors` expose only backend-supported facts.
+- Platform desktop/mobile navigation is separate from merchant/operator navigation.
+- Global platform routes do not display the merchant Organization switcher.
+- No user-facing `New merchant`, Merchant ranking or Merchant 360° navigation remains in the active Phase 4 routes.
+
+Provisioning:
+- `POST /console/api/admin/organizations/provision` is platform-admin only.
+- Read-only preview must reject it with HTTP 423 before mutation logic.
+- The handler creates the hidden Merchant boundary, optional owner membership, Organization and principal BRL account.
+- Existing database triggers initialize KYC draft state and pricing v1.
+- If a downstream provisioning step fails, the newly-created Merchant is deleted so cascade constraints remove partial Organization/account state.
+
+Product acceptance:
+- Organization directory columns and metrics must not silently turn failed reads into zero.
+- Organization 360° must preserve successful-Pix revenue realization and provider-cost completeness semantics from Phase 3.
+- Pricing selection is by Organization in the UI even though pricing remains merchant-scoped internally.
+- KYC presents Organization/commercial-account vocabulary while retaining merchant-scoped backend authorization.
+- Users view must not invent Auth fields such as email verification or last login until a dedicated admin contract exists.
+- Processors view must not invent latency, availability, approval or routing scores until telemetry contracts exist.
 
 ## Incident / rollback rule
 

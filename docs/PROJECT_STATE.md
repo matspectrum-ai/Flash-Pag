@@ -4,10 +4,11 @@ Last reconciled from the repository, GitHub CI and Railway preview: 2026-09-06.
 
 ## Current development state
 
-- Active development branch: `feat/admin-finance-merchant-360`.
+- Active development branch: `feat/platform-admin-organizations`.
 - Phase 1 — KYC/KYB: COMPLETE.
 - Phase 2 — Pricing/Taxas: COMPLETE.
 - Phase 3 — Admin Financeiro + Merchant 360°: COMPLETE.
+- Phase 4 — Platform Admin centered on Organizations: IN PROGRESS.
 - Refund/reversal ledgering remains financial-core hardening; it is not the primary Phase 3 scope.
 
 The final Phase 3 code checkpoint before completion documentation is `2610afd62cc6b41418241514c32f92e8882bb7e9`. Decision commit `9f4a60f981f083ea9f64beb27418444c9678d877` records the finalized revenue-realization and business-timezone contracts.
@@ -83,6 +84,7 @@ Frontend:
 - `0007_merchant_pricing.sql`: versioned merchant pricing and frozen transaction fees.
 - `0008_pricing_hardening.sql`: pricing hardening.
 - `0009_pricing_fk_indexes.sql`: pricing FK/index coverage.
+- `0010_platform_organization_provisioning.sql`: atomic platform-admin Organization provisioning over the existing Merchant/Organization model.
 
 No Phase 3 database migration is currently required. Phase 3 adds read contracts over existing state instead of new persistence.
 
@@ -120,6 +122,22 @@ Product guardrails:
 - Merchant navigation does not expose Transferências.
 - Merchant transaction presentation remains focused on incoming Pix.
 - Saques UI is deferred to its dedicated later phase.
+
+## Phase 4 implementation in progress
+
+The platform-admin information architecture is being refactored from a generic Merchant/Organization SaaS control plane into an Organization-centric payments control plane. `Merchant` remains the internal boundary for KYC, pricing and membership, but is no longer a first-class operator concept.
+
+Current Phase 4 implementation includes:
+- `/platform` as the global Dashboard using Phase 3 financial semantics.
+- `/platform/organizations` as the Organization directory with KYC, processor, TPV, balance and pricing context.
+- `/platform/organizations/:organizationId` as Organization 360°.
+- `/platform/users`, `/platform/transactions`, `/platform/balances` and `/platform/processors` using existing read contracts only.
+- Dedicated platform desktop/mobile navigation that is separate from the merchant/operator panel.
+- One user-facing `New organization` provisioning flow. The backend creates the internal Merchant boundary, optional owner membership, Organization and default BRL account; existing triggers initialize KYC and pricing.
+- Compensating rollback of the newly-created Merchant if owner assignment, Organization creation or account creation fails.
+- KYC and Pricing surfaces display/select Organizations while resolving Merchant IDs internally.
+
+Phase 4 adds migration `0010_platform_organization_provisioning.sql` to make platform Organization provisioning atomic at the PostgreSQL transaction boundary. It does not rename or replace existing Merchant/Organization schema; it adds one service-role RPC over the existing model.
 
 ## Financial semantics / guardrails
 

@@ -46,6 +46,19 @@ export function PlatformKYCPage() {
     queryFn: api.adminKYCQueue,
     enabled: Boolean(me?.user.platform_admin),
   })
+  const tenantsQuery = useQuery({
+    queryKey: ['platform-tenants'],
+    queryFn: api.adminTenants,
+    enabled: Boolean(me?.user.platform_admin),
+    staleTime: 30_000,
+  })
+  const organizationNameByMerchant = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const organization of tenantsQuery.data?.organizations ?? []) {
+      if (!map.has(organization.merchant_id)) map.set(organization.merchant_id, organization.name)
+    }
+    return map
+  }, [tenantsQuery.data?.organizations])
   const detailQuery = useQuery({
     queryKey: ['platform-kyc-detail', selectedMerchantId],
     queryFn: () => api.adminKYCDetail(selectedMerchantId!),
@@ -88,9 +101,9 @@ export function PlatformKYCPage() {
       if (filter === 'queue' && status !== 'submitted' && status !== 'under_review') return false
       if (!['queue','all'].includes(filter) && status !== filter) return false
       if (!needle) return true
-      return [row.merchant_name, row.legal_name, row.tax_id, row.company_email, row.merchant_id].some((value) => value?.toLowerCase().includes(needle))
+      return [organizationNameByMerchant.get(row.merchant_id), row.merchant_name, row.legal_name, row.tax_id, row.company_email].some((value) => value?.toLowerCase().includes(needle))
     })
-  }, [rows, filter, search])
+  }, [rows, filter, search, organizationNameByMerchant])
 
   if (!me?.user.platform_admin) return <div className="error-state"><ShieldCheck size={22} /><strong>Acesso restrito à plataforma.</strong></div>
   if (queueQuery.isLoading) return <div className="skeleton skeleton-panel" aria-busy="true" />
@@ -98,11 +111,12 @@ export function PlatformKYCPage() {
 
   return (
     <div className="page-stack">
+      {tenantsQuery.isError || tenantsQuery.data?.complete === false ? <div className="attention-banner"><div className="attention-icon"><CircleAlert size={17} /></div><div><strong>Mapeamento de organizações parcial</strong><span>A fila KYC permanece disponível, mas alguns nomes de organização podem não ser resolvidos pelo inventário administrativo.</span></div></div> : null}
       <section className="platform-metrics">
         <article className="metric-card"><div className="metric-label"><Clock3 size={16} /><span>Aguardando análise</span></div><strong>{counts.submitted ?? 0}</strong><span className="metric-detail">Submetidos</span></article>
         <article className="metric-card"><div className="metric-label"><Eye size={16} /><span>Em análise</span></div><strong>{counts.under_review ?? 0}</strong><span className="metric-detail">Revisões abertas</span></article>
-        <article className="metric-card"><div className="metric-label"><CircleAlert size={16} /><span>Correções</span></div><strong>{counts.needs_changes ?? 0}</strong><span className="metric-detail">Aguardando merchant</span></article>
-        <article className="metric-card"><div className="metric-label"><CheckCircle2 size={16} /><span>Aprovados</span></div><strong>{counts.approved ?? 0}</strong><span className="metric-detail">Merchants verificados</span></article>
+        <article className="metric-card"><div className="metric-label"><CircleAlert size={16} /><span>Correções</span></div><strong>{counts.needs_changes ?? 0}</strong><span className="metric-detail">Aguardando organização</span></article>
+        <article className="metric-card"><div className="metric-label"><CheckCircle2 size={16} /><span>Aprovados</span></div><strong>{counts.approved ?? 0}</strong><span className="metric-detail">Contas comerciais verificadas</span></article>
       </section>
 
       <section className="toolbar platform-kyc-toolbar">
@@ -115,14 +129,14 @@ export function PlatformKYCPage() {
       </section>
 
       <section className="panel">
-        <div className="panel-header"><div><h2>Verificações de Merchant</h2><p>Analise dados empresariais e documentos antes de liberar operações financeiras reais.</p></div><span className="count-pill">{filtered.length}</span></div>
+        <div className="panel-header"><div><h2>Verificações das contas comerciais</h2><p>Analise dados empresariais e documentos antes de liberar operações financeiras reais.</p></div><span className="count-pill">{filtered.length}</span></div>
         <div className="table-wrap">
           <table className="data-table interactive-table">
-            <thead><tr><th>Merchant</th><th>CNPJ</th><th>Status</th><th>Documentos</th><th>Enviado / atualizado</th></tr></thead>
+            <thead><tr><th>Organização</th><th>CNPJ</th><th>Status</th><th>Documentos</th><th>Enviado / atualizado</th></tr></thead>
             <tbody>
               {filtered.map((row) => (
                 <tr className="kyc-admin-row" key={row.merchant_id} onClick={() => setSelectedMerchantId(row.merchant_id)}>
-                  <td><div className="kyc-admin-merchant"><strong>{row.legal_name || row.merchant_name}</strong><span>{row.company_email || row.merchant_name}</span></div></td>
+                  <td><div className="kyc-admin-merchant"><strong>{organizationNameByMerchant.get(row.merchant_id) || row.legal_name || row.merchant_name}</strong><span>{row.legal_name || row.company_email || row.merchant_name}</span></div></td>
                   <td className="mono subtle-text">{maskDocument(row.tax_id || undefined)}</td>
                   <td>{statusPill(row.kyc_status)}</td>
                   <td>{row.document_count ?? 0}</td>
@@ -138,17 +152,17 @@ export function PlatformKYCPage() {
       {selectedMerchantId ? (
         <div className="drawer-backdrop" role="presentation" onMouseDown={() => { setSelectedMerchantId(null); setDecision(null) }}>
           <aside className="drawer kyc-admin-detail" role="dialog" aria-modal="true" aria-label="Análise KYC" onMouseDown={(event) => event.stopPropagation()}>
-            <div className="drawer-header"><div><span className="eyebrow">Compliance</span><h2>{detailQuery.data?.profile.legal_name || detailQuery.data?.merchant.name || 'Análise KYC'}</h2></div><button className="icon-button" type="button" onClick={() => setSelectedMerchantId(null)}><X size={18} /></button></div>
+            <div className="drawer-header"><div><span className="eyebrow">Compliance</span><h2>{(selectedMerchantId ? organizationNameByMerchant.get(selectedMerchantId) : undefined) || detailQuery.data?.profile.legal_name || 'Análise KYC'}</h2></div><button className="icon-button" type="button" onClick={() => setSelectedMerchantId(null)}><X size={18} /></button></div>
             {detailQuery.isLoading ? <div className="skeleton skeleton-panel" /> : null}
             {detailQuery.isError ? <div className="inline-error">Não foi possível carregar os detalhes.</div> : null}
             {detailQuery.data ? <KYCAdminDetail detail={detailQuery.data} previewReadOnly={previewReadOnly} onStart={() => startMutation.mutate(selectedMerchantId)} onDecision={setDecision} starting={startMutation.isPending} /> : null}
 
             {decision && detailQuery.data ? (
               <div className="kyc-admin-section">
-                <h3>{decision === 'approved' ? 'Aprovar Merchant' : decision === 'needs_changes' ? 'Solicitar correção' : 'Recusar verificação'}</h3>
+                <h3>{decision === 'approved' ? 'Aprovar organização' : decision === 'needs_changes' ? 'Solicitar correção' : 'Recusar verificação'}</h3>
                 <div className="financial-form">
-                  {decision !== 'approved' ? <label className="field"><span>Observação para o Merchant *</span><textarea rows={4} value={publicNote} onChange={(event) => setPublicNote(event.target.value)} placeholder="Explique exatamente o que precisa ser corrigido ou o motivo da recusa." /></label> : <label className="field"><span>Mensagem para o Merchant <em>opcional</em></span><textarea rows={3} value={publicNote} onChange={(event) => setPublicNote(event.target.value)} /></label>}
-                  <label className="field"><span>Nota interna <em>somente Admin</em></span><textarea rows={4} value={internalNote} onChange={(event) => setInternalNote(event.target.value)} placeholder="Contexto interno de compliance. Nunca será mostrado ao Merchant." /></label>
+                  {decision !== 'approved' ? <label className="field"><span>Observação para a organização *</span><textarea rows={4} value={publicNote} onChange={(event) => setPublicNote(event.target.value)} placeholder="Explique exatamente o que precisa ser corrigido ou o motivo da recusa." /></label> : <label className="field"><span>Mensagem para a organização <em>opcional</em></span><textarea rows={3} value={publicNote} onChange={(event) => setPublicNote(event.target.value)} /></label>}
+                  <label className="field"><span>Nota interna <em>somente Admin</em></span><textarea rows={4} value={internalNote} onChange={(event) => setInternalNote(event.target.value)} placeholder="Contexto interno de compliance. Nunca será mostrado à organização." /></label>
                   {previewReadOnly ? <div className="inline-info">Decisões ficam bloqueadas no preview read-only.</div> : null}
                   {decisionMutation.isError ? <div className="inline-error">{decisionMutation.error instanceof Error ? decisionMutation.error.message : 'Não foi possível aplicar a decisão.'}</div> : null}
                   <div className="form-actions"><button className="button button-secondary" type="button" onClick={() => setDecision(null)}>Cancelar</button><button className="button button-primary" type="button" disabled={previewReadOnly || decisionMutation.isPending || (decision !== 'approved' && !publicNote.trim())} onClick={() => decisionMutation.mutate({ merchantId: selectedMerchantId, value: decision })}>{decisionMutation.isPending ? 'Aplicando…' : 'Confirmar decisão'}</button></div>
@@ -178,7 +192,7 @@ function KYCAdminDetail({ detail, previewReadOnly, onStart, onDecision, starting
       <section className="kyc-admin-section"><h3>Representante legal</h3><div className="kyc-admin-grid"><Data label="Nome" value={profile.representative_name} /><Data label="CPF" value={profile.representative_document} /><Data label="Nascimento" value={profile.representative_birth_date} /><Data label="Cargo" value={profile.representative_role} /><Data label="E-mail" value={profile.representative_email} /><Data label="Telefone" value={profile.representative_phone} /></div></section>
       <section className="kyc-admin-section"><h3>Documentos</h3><div className="kyc-admin-documents">{detail.documents.filter((doc) => doc.is_current).map((doc) => <article className="kyc-admin-document" key={doc.id}><FileText size={17} /><div><strong>{doc.document_type.replaceAll('_', ' ')}</strong><span>{doc.original_name} · {Math.ceil(doc.size_bytes / 1024)} KB · v{doc.version}</span></div><button className="button button-secondary" type="button" onClick={() => window.open(api.adminKYCDocumentURL(detail.merchant.id, doc.id), '_blank', 'noopener,noreferrer')}>Abrir</button></article>)}</div></section>
       {canReview ? <section className="kyc-admin-section"><h3>Decisão</h3>{profile.status === 'submitted' ? <button className="button button-secondary button-full" type="button" disabled={previewReadOnly || starting} onClick={onStart}><Eye size={15} />{starting ? 'Iniciando…' : 'Iniciar análise'}</button> : null}<div className="kyc-decision-grid" style={{ marginTop: 10 }}><button className="button button-secondary approve" type="button" onClick={() => onDecision('approved')} disabled={previewReadOnly}><CheckCircle2 size={15} />Aprovar</button><button className="button button-secondary changes" type="button" onClick={() => onDecision('needs_changes')} disabled={previewReadOnly}><CircleAlert size={15} />Pedir correção</button><button className="button button-secondary reject" type="button" onClick={() => onDecision('rejected')} disabled={previewReadOnly}><XCircle size={15} />Recusar</button></div></section> : null}
-      <section className="kyc-admin-section"><h3>Histórico de análise</h3><div className="kyc-review-history">{detail.reviews.map((review) => <div className="kyc-review-item" key={review.id}><strong>{labels[review.action] || review.action}</strong><span>{review.reviewer_email || 'Admin'} · {formatDateTime(review.created_at)}</span>{review.public_note ? <p>Merchant: {review.public_note}</p> : null}{review.internal_note ? <p>Interno: {review.internal_note}</p> : null}</div>)}{!detail.reviews.length ? <span className="subtle-text">Nenhuma decisão registrada.</span> : null}</div></section>
+      <section className="kyc-admin-section"><h3>Histórico de análise</h3><div className="kyc-review-history">{detail.reviews.map((review) => <div className="kyc-review-item" key={review.id}><strong>{labels[review.action] || review.action}</strong><span>{review.reviewer_email || 'Admin'} · {formatDateTime(review.created_at)}</span>{review.public_note ? <p>Organização: {review.public_note}</p> : null}{review.internal_note ? <p>Interno: {review.internal_note}</p> : null}</div>)}{!detail.reviews.length ? <span className="subtle-text">Nenhuma decisão registrada.</span> : null}</div></section>
     </>
   )
 }

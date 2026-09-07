@@ -76,3 +76,36 @@ func TestPhase3AdminReadRoutesRequireAuthentication(t *testing.T) {
 		})
 	}
 }
+
+func TestPhase4AdminAppRoutesFallBackToSPAIndex(t *testing.T) {
+	s := New(config.Config{}, nil, nil, provider.NewRegistry(), slog.Default())
+	paths := []string{
+		"/app/platform",
+		"/app/platform/organizations",
+		"/app/platform/organizations/00000000-0000-0000-0000-000000000000",
+		"/app/platform/users",
+		"/app/platform/transactions",
+		"/app/platform/balances",
+		"/app/platform/processors",
+	}
+	for _, path := range paths {
+		t.Run(path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			rr := httptest.NewRecorder()
+			s.Handler().ServeHTTP(rr, req)
+			if rr.Code != http.StatusOK {
+				t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
+			}
+		})
+	}
+}
+
+func TestPhase4ProvisionRouteRequiresAuthentication(t *testing.T) {
+	s := New(config.Config{}, nil, nil, provider.NewRegistry(), slog.Default())
+	req := httptest.NewRequest(http.MethodPost, "/console/api/admin/organizations/provision", nil)
+	rr := httptest.NewRecorder()
+	s.Handler().ServeHTTP(rr, req)
+	if rr.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want %d", rr.Code, http.StatusUnauthorized)
+	}
+}

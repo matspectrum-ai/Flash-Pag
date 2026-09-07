@@ -3,6 +3,8 @@ import type {
   AdminMerchantInput,
   AdminMerchantMembersResponse,
   AdminOrganizationInput,
+  AdminProvisionOrganizationInput,
+  AdminProvisionOrganizationResult,
   AdminTenantInventory,
   ApiErrorShape,
   ApiKeyInput,
@@ -202,6 +204,11 @@ export const api = {
     }),
   adminCreateOrganization: (input: AdminOrganizationInput) =>
     request<Organization & { accounts?: unknown[] }>('/console/api/admin/organizations', {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }),
+  adminProvisionOrganization: (input: AdminProvisionOrganizationInput) =>
+    request<AdminProvisionOrganizationResult>('/console/api/admin/organizations/provision', {
       method: 'POST',
       body: JSON.stringify(input),
     }),

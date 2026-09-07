@@ -80,6 +80,37 @@ Detailed working plan: `docs/phases/PHASE_3_ADMIN_FINANCE_MERCHANT_360.md`.
 
 Completion evidence: final code checkpoint `2610afd62cc6b41418241514c32f92e8882bb7e9` passed CI and exact-image read-only Railway validation, followed by authenticated platform-admin visual acceptance of Admin Financeiro and Merchant 360° on desktop/mobile. The final completion documentation commit is docs-only and is revalidated as an exact head per the same gate.
 
+## Phase 4 — Platform Admin centered on Organizations
+
+Status: IN PROGRESS.
+
+Required outcome:
+- Replace the generic `Administração`/Merchant-first UI with a payments-operations control plane.
+- Organization/Commercial Account is the first-class platform-admin tenant concept.
+- `Merchant` remains an internal domain boundary for membership, KYC/KYB and pricing.
+- `/platform` becomes the global Dashboard.
+- Add Organization directory and Organization 360° drill-down.
+- Add truthful global Users, Transactions, Balances and Processors views using existing backend facts.
+- KYC and Pricing are presented through Organization context while retaining merchant-scoped backend invariants.
+- New Organization is a single provisioning action that creates the hidden Merchant boundary, optional owner membership, Organization and principal BRL account.
+- Preserve all Phase 3 financial semantics and merchant-product navigation guardrails.
+
+Explicit exclusions:
+- No schema/table rename from Merchant to Organization merely for UX vocabulary.
+- No fake processor-health, reconciliation or audit-log metrics without dedicated contracts.
+- No withdrawal UI in the merchant panel.
+
+Release gate:
+1. Implementation and permanent documentation on `feat/platform-admin-organizations`.
+2. TypeScript/Vite build, `gofmt`, `go test ./...` and `go vet ./...` green.
+3. CI green on the exact branch head.
+4. Read-only preview validates Dashboard, Organizations, Organization 360°, Users, Transactions, Balances, Processors, KYC and Pricing.
+5. Provisioning mutation remains rejected with HTTP 423 on read-only preview.
+6. Production `flash-pag` remains on `feat/minimal-pix-gateway`.
+7. Phase status changes to COMPLETE only after authenticated product/visual acceptance.
+
+Detailed working plan: `docs/phases/PHASE_4_PLATFORM_ADMIN_ORGANIZATIONS.md`.
+
 ## Later phases
 
 The exact order after Phase 3 must be explicitly agreed before implementation. Known backlog items include:

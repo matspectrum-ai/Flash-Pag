@@ -322,6 +322,17 @@ export type AdminOrganizationInput = {
   slug: string
 }
 
+export type AdminProvisionOrganizationInput = {
+  name: string
+  slug: string
+  owner_user_id?: string
+}
+
+export type AdminProvisionOrganizationResult = {
+  organization: Organization
+  account: Account
+}
+
 export type ApiErrorShape = {
   error?: {
     code?: string
