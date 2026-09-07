@@ -1,0 +1,29 @@
+name: retag-phase4-staging
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - benchmark/publish-phase4-3cb3670
+
+jobs:
+  retag:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Repoint isolated Railway staging tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE="ttl.sh/flashpag-staging-8c2e392-20260907:24h"
+          TARGET="ttl.sh/flashpag-phase3-2610afd-20260906:24h"
+          docker pull "$SOURCE"
+          SOURCE_ID="$(docker image inspect "$SOURCE" --format '{{.Id}}')"
+          docker tag "$SOURCE" "$TARGET"
+          docker push "$TARGET"
+          docker pull "$TARGET"
+          TARGET_ID="$(docker image inspect "$TARGET" --format '{{.Id}}')"
+          echo "SOURCE_IMAGE_ID=$SOURCE_ID"
+          echo "TARGET_IMAGE_ID=$TARGET_ID"
+          test "$SOURCE_ID" = "$TARGET_ID"
