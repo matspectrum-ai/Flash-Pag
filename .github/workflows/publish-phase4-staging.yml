@@ -1,0 +1,27 @@
+name: publish-phase4-staging
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - benchmark/publish-phase4-3cb3670
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact staging head
+        uses: actions/checkout@v4
+        with:
+          ref: 8c2e3929cbe239a4e1abf2f0ed4db02c863dd623
+      - name: Build writable staging image
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE="ttl.sh/flashpag-staging-8c2e392-20260907:24h"
+          docker build --build-arg VITE_PREVIEW_READ_ONLY=false -t "$IMAGE" .
+          docker push "$IMAGE"
+          docker pull "$IMAGE"
+          docker image inspect "$IMAGE" --format "IMAGE_ID={{.Id}}"
