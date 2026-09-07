@@ -34,6 +34,34 @@ func (p *Provider) CreateTransfer(_ context.Context, _ provider.Connection, in p
 	return provider.TransferResult{ExternalID: ext, Status: "pending"}, nil
 }
 
+// Reconcile deterministically settles mock operations so staging and local environments
+// can exercise the same reconciliation and ledger paths used by real providers.
+func (p *Provider) Reconcile(_ context.Context, _ provider.Connection, kind, externalID string) (provider.ReconcileResult, error) {
+	externalID = strings.TrimSpace(externalID)
+	var prefix string
+	switch kind {
+	case "pix_in":
+		prefix = "mock_charge_"
+	case "transfer", "withdrawal":
+		prefix = "mock_transfer_"
+	default:
+		return provider.ReconcileResult{}, fmt.Errorf("unsupported mock operation kind %q", kind)
+	}
+	if externalID == "" || !strings.HasPrefix(externalID, prefix) {
+		return provider.ReconcileResult{}, errors.New("mock provider identity does not match operation kind")
+	}
+	raw, err := json.Marshal(map[string]string{
+		"external_id": externalID,
+		"kind":        kind,
+		"source":      "mock_reconcile",
+		"status":      "succeeded",
+	})
+	if err != nil {
+		return provider.ReconcileResult{}, err
+	}
+	return provider.ReconcileResult{ExternalID: externalID, Status: "succeeded", Raw: raw}, nil
+}
+
 func (p *Provider) VerifyWebhook(_ context.Context, conn provider.Connection, headers map[string][]string, body []byte) (provider.WebhookEvent, error) {
 	var creds struct {
 		WebhookSecret string `json:"webhook_secret"`
@@ -66,3 +94,5 @@ func first(h map[string][]string, key string) string {
 	}
 	return ""
 }
+
+var _ provider.Reconciler = (*Provider)(nil)
