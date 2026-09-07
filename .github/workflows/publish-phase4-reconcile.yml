@@ -1,0 +1,19 @@
+name: publish-phase4-reconcile
+on:
+  push:
+    branches: [benchmark/publish-phase4-6c03b6b]
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 6c03b6b59e7b2d7145db5f97a8296c968f606345
+      - name: Build exact writable staging image
+        run: |
+          docker build --build-arg VITE_PREVIEW_READ_ONLY=false -t ttl.sh/flashpag-phase4-6c03b6b-20260907:24h .
+          docker tag ttl.sh/flashpag-phase4-6c03b6b-20260907:24h ttl.sh/flashpag-phase3-aa137ea-20260906:24h
+      - name: Publish exact and staging tags
+        run: |
+          docker push ttl.sh/flashpag-phase4-6c03b6b-20260907:24h
+          docker push ttl.sh/flashpag-phase3-aa137ea-20260906:24h
