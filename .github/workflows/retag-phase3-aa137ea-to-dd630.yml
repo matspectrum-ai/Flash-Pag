@@ -1,0 +1,28 @@
+name: retag-phase3-aa137ea-to-dd630
+
+on:
+  push:
+    branches:
+      - benchmark/publish-phase3-aa137ea
+
+permissions:
+  contents: read
+
+jobs:
+  retag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull exact completion image and retag legacy preview tag
+        run: |
+          set -euo pipefail
+          FINAL="ttl.sh/flashpag-phase3-aa137ea-20260906:24h"
+          LEGACY="ttl.sh/flashpag-phase3-dd630ade-20260906:24h"
+          docker pull "$FINAL"
+          FINAL_ID="$(docker image inspect "$FINAL" --format '{{.Id}}')"
+          docker tag "$FINAL" "$LEGACY"
+          docker push "$LEGACY"
+          docker pull "$LEGACY"
+          LEGACY_ID="$(docker image inspect "$LEGACY" --format '{{.Id}}')"
+          echo "FINAL_IMAGE_ID=$FINAL_ID"
+          echo "LEGACY_IMAGE_ID=$LEGACY_ID"
+          test "$FINAL_ID" = "$LEGACY_ID"
