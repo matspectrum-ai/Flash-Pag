@@ -103,7 +103,7 @@ Use an isolated read-only Railway service built from a Docker image pinned to th
 4. Deploy the image to a separate Railway preview service.
 5. Configure runtime secrets through Railway reference variables to the existing preview/shared values; do not copy secret plaintext into GitHub or build logs.
 6. Configure `APP_PREVIEW_READ_ONLY=true`, `APP_ADDR=:8080`, secure cookies and `/healthz`.
-7. Give the isolated service its own Railway preview domain on port 8080.
+7. Give the isolated service its own Railway preview domain on port 8080 and set `APP_PUBLIC_URL` to that exact isolated domain. Do not inherit a canonical-preview public URL, or authentication redirects may leave the exact-head service.
 8. Run the same health, SPA and HTTP 423 probes used for the canonical preview.
 9. Record the exact Git SHA, image identity and Railway deployment ID in project state/verification history.
 10. Treat temporary external image registries as validation transport only, not long-term production artifact storage.
@@ -171,6 +171,20 @@ Merchant 360°:
 Merchant panel guardrails:
 - Do not add Transferências navigation/page back into the merchant product UI.
 - Do not add Saques UI until its dedicated phase.
+
+## Phase 3 completion acceptance
+
+Authenticated visual acceptance completed on 2026-09-06 against exact code checkpoint `2610afd62cc6b41418241514c32f92e8882bb7e9` on isolated Railway service `flash-pag-phase3-final-preview`. The preview remained backend/UI read-only and production remained unchanged.
+
+Accepted behavior included:
+- Admin Financeiro 7/30/90 switching and `America/Sao_Paulo` business-calendar presentation.
+- TPV, realized Flash Pag revenue, provider cost and margin kept semantically distinct.
+- Pending/failed global and Merchant 360° Pix rows rendered `—` for realized revenue/provider cost/margin.
+- Merchant 360° KYC, pricing, members, Organization balance/account/customer/connection counts, connection details and recent Pix.
+- Responsive desktop/mobile layouts with no Transferências or Saques navigation reintroduced.
+- Exact preview authentication staying on the isolated domain after setting its own `APP_PUBLIC_URL`.
+
+Do not fabricate non-admin identities or induce destructive business failures only to repeat acceptance. Authorization/error-state guarantees should be exercised by tests and safe runtime boundary probes unless a legitimate test identity/state already exists.
 
 ## Incident / rollback rule
 

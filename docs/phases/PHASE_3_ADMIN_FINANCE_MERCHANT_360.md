@@ -1,11 +1,11 @@
 # Phase 3 — Admin Financeiro + Merchant 360°
 
-Status: IN PROGRESS.
+Status: COMPLETE.
 
 Development branch: `feat/admin-finance-merchant-360`.
 
 Recovered implementation baseline after timeout: `9f0cac522be4735f0a5028b8d49dba1a1f65ddef`.
-Latest implementation code checkpoint before this documentation reconciliation: `42630f40de04f5676b404dc2409ae06ed869386c`.
+Final Phase 3 code checkpoint before completion documentation: `2610afd62cc6b41418241514c32f92e8882bb7e9`.
 Latest durable financial-decision checkpoint before this documentation reconciliation: `9f4a60f981f083ea9f64beb27418444c9678d877`.
 
 ## Goal
@@ -146,9 +146,11 @@ Exact-image checkpoint `dd630ade7984eb445dc1aa7097ccdfd38b253644` was built from
 
 A static finance/product audit after that checkpoint found and corrected three additional correctness classes: mixed browser/UTC financial date boundaries, non-successful `fee_minor` displayed as row revenue, and failed Merchant 360° reads/missing pricing rules being visually ambiguous with real empty/unconfigured state.
 
-The documentation reconciliation following those fixes creates a newer final candidate head. That candidate must pass exact-head CI and the same pinned-image Railway runtime gate before being reported as the latest technical checkpoint.
+Final code checkpoint `2610afd62cc6b41418241514c32f92e8882bb7e9` passed CI, pinned-image Railway runtime validation, read-only mutation protection and unauthenticated admin-boundary probes. Authenticated platform-admin product/visual acceptance completed on 2026-09-06 against isolated service `flash-pag-phase3-final-preview`. The isolated preview required `APP_PUBLIC_URL` to point to its own domain so authentication would not redirect to the stale canonical preview; production was not changed.
 
-Phase 3 intentionally remains IN PROGRESS. Authenticated visual/product acceptance is still required before changing status to COMPLETE. The Opera Browser Connector is currently disconnected and no admin test credential is stored in the repository, so that gate is not bypassed by fabricating a session or mutating Supabase Auth.
+Authenticated acceptance verified Admin Financeiro 7/30/90 switching, Brasília business-calendar copy, TPV/revenue/provider-cost/margin separation, merchant ranking and global Pix rows. Pending/failed rows rendered `—` for realized revenue/provider cost/margin. Merchant 360° was verified for the real beta merchant with one Organization, approved KYC, current Pix pricing, one merchant member/owner, one account, one customer, three provider connections and recent Pix activity. Desktop and mobile responsive layouts were inspected, and Transferências/Saques were absent from merchant navigation. Live failure-state induction and a fabricated non-admin session were intentionally not used; failure-state rendering and non-admin authorization remain covered by implementation/tests, while unauthenticated admin reads were runtime-verified as HTTP 401.
+
+Phase 3 is COMPLETE. The docs-only completion commit created by this reconciliation must still pass CI and the exact-head read-only runtime gate before being treated as the permanent completion checkpoint.
 
 ## Definition of phase completion
 

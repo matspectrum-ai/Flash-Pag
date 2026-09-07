@@ -39,7 +39,7 @@ Detailed retrospective: `docs/phases/PHASE_2_PRICING.md`.
 
 ## Phase 3 — Admin Financeiro + Merchant 360°
 
-Status: IN PROGRESS.
+Status: COMPLETE.
 
 Required outcome:
 - Global platform financial dashboard.
@@ -77,6 +77,8 @@ Release gate:
 8. Phase status changes to COMPLETE only after the agreed authenticated product/visual acceptance is complete.
 
 Detailed working plan: `docs/phases/PHASE_3_ADMIN_FINANCE_MERCHANT_360.md`.
+
+Completion evidence: final code checkpoint `2610afd62cc6b41418241514c32f92e8882bb7e9` passed CI and exact-image read-only Railway validation, followed by authenticated platform-admin visual acceptance of Admin Financeiro and Merchant 360° on desktop/mobile. The final completion documentation commit is docs-only and is revalidated as an exact head per the same gate.
 
 ## Later phases
 

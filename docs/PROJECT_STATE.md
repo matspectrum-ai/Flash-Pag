@@ -7,12 +7,12 @@ Last reconciled from the repository, GitHub CI and Railway preview: 2026-09-06.
 - Active development branch: `feat/admin-finance-merchant-360`.
 - Phase 1 — KYC/KYB: COMPLETE.
 - Phase 2 — Pricing/Taxas: COMPLETE.
-- Phase 3 — Admin Financeiro + Merchant 360°: IN PROGRESS.
+- Phase 3 — Admin Financeiro + Merchant 360°: COMPLETE.
 - Refund/reversal ledgering remains financial-core hardening; it is not the primary Phase 3 scope.
 
-The latest implementation code checkpoint before this documentation reconciliation is `42630f40de04f5676b404dc2409ae06ed869386c`. The subsequent decision commit `9f4a60f981f083ea9f64beb27418444c9678d877` records the finalized revenue-realization and business-timezone contracts.
+The final Phase 3 code checkpoint before completion documentation is `2610afd62cc6b41418241514c32f92e8882bb7e9`. Decision commit `9f4a60f981f083ea9f64beb27418444c9678d877` records the finalized revenue-realization and business-timezone contracts.
 
-Phase 3 remains IN PROGRESS because authenticated visual/product acceptance is a separate release gate. Technical CI/runtime validation does not substitute for that product review.
+Phase 3 authenticated visual/product acceptance completed on 2026-09-06 against the isolated exact-image Railway preview for code checkpoint `2610afd62cc6b41418241514c32f92e8882bb7e9`. The final completion documentation commit remains docs-only and must pass the same exact-head CI/runtime gate before it is treated as the permanent completion checkpoint.
 
 ## Deployment separation
 
@@ -34,12 +34,13 @@ Stable development preview:
 
 Exact-head validation workaround:
 - Exact commit images are built from a pinned Git SHA with `VITE_PREVIEW_READ_ONLY=true` and no secrets embedded in the image.
-- Railway service `flash-pag-phase3-dd630-preview` validated this approach for commit `dd630ade7984eb445dc1aa7097ccdfd38b253644`.
-- Its deployment `24c05e4c-a2aa-4089-87e5-6d9a67c37062` completed successfully.
+- Railway service `flash-pag-phase3-dd630-preview` first validated this approach for commit `dd630ade7984eb445dc1aa7097ccdfd38b253644`.
+- Final Phase 3 code checkpoint `2610afd62cc6b41418241514c32f92e8882bb7e9` was published as the pinned image `ttl.sh/flashpag-phase3-2610afd-20260906:24h` and deployed to isolated service `flash-pag-phase3-final-preview`.
+- After correcting only that isolated preview's `APP_PUBLIC_URL` to its own domain, deployment `1efe532f-6b3c-42f6-9e59-b14053d21362` succeeded and authenticated acceptance remained on the exact preview instead of redirecting to the stale canonical preview.
 - Runtime probes confirmed `/healthz` HTTP 200 with `preview_read_only:true`, SPA routes for `/app/`, Financeiro and Merchant 360° returning HTTP 200, and a harmless mutating POST rejected with HTTP 423 `preview_read_only`.
 - Runtime secrets are referenced internally from the existing preview service; they are not embedded in the image or exposed in repository files.
 
-After the current documentation reconciliation, the final branch head must pass CI and receive the same exact-image runtime validation before a new technical checkpoint is declared.
+The completion documentation commit created after authenticated acceptance is docs-only; it must pass CI and the same exact-image runtime validation before becoming the permanent Phase 3 completion checkpoint.
 
 ## Platform portability benchmark
 
@@ -133,6 +134,18 @@ Product guardrails:
 
 ## Verification state
 
+Final code checkpoint `2610afd62cc6b41418241514c32f92e8882bb7e9`:
+- GitHub CI green.
+- Exact-image Railway deployment green and read-only.
+- External health/SPA/mutation probes green.
+- Admin endpoints reject unauthenticated requests with HTTP 401; server-side admin guards/tests cover authenticated non-admin denial without fabricating a live non-admin account.
+- Authenticated platform-admin visual acceptance completed on the exact preview after fixing its isolated `APP_PUBLIC_URL`.
+- Admin Financeiro 7/30/90 switches, Brasília business-calendar copy, global metrics, merchant ranking and global Pix rows were inspected.
+- Pending/failed Pix rows showed `—` for realized revenue/provider cost/margin.
+- Merchant 360° was inspected for the real beta merchant with one Organization, approved KYC, current pricing, member role, exact counts, connection details and recent Pix.
+- Desktop and mobile layouts were inspected; merchant navigation did not expose Transferências or Saques.
+- Production remained on `feat/minimal-pix-gateway`.
+
 Validated earlier exact-image checkpoint `dd630ade7984eb445dc1aa7097ccdfd38b253644`:
 - GitHub CI green.
 - Railway exact-image deployment green.
@@ -141,12 +154,11 @@ Validated earlier exact-image checkpoint `dd630ade7984eb445dc1aa7097ccdfd38b2536
 - HTTP 423 mutation guard green.
 - Production remained on `feat/minimal-pix-gateway`.
 
-The implementation subsequently received the financial-date, row-revenue and incomplete-read correctness fixes described above. The reconciled documentation head created by this update sequence must now pass the same CI and exact-image preview gate.
+The implementation subsequently received the financial-date, row-revenue and incomplete-read correctness fixes described above. Authenticated acceptance then completed against the final code checkpoint. This completion documentation head must now pass the same CI and exact-image preview gate; no product code changed in the completion commit.
 
-## Current risks / next Phase 3 work
+## Residual risks / post-Phase 3 backlog
 
 - Pixhub has no verified provider-cost contract; cost and dependent margin intentionally remain unavailable rather than estimated.
 - Per-Organization transaction reads remain capped at 1,000 rows and the UI flags truncation. At larger measured scale, a server-side financial read model may be justified.
 - Tenant inventory has an explicit 10,000-row safety ceiling and reports incompleteness rather than silently truncating.
-- Authenticated visual/product acceptance of Financeiro and Merchant 360° is still pending because the Opera Browser Connector is currently disconnected and no repository-documented admin test credential exists.
 - Refund/reversal compensating ledger journals remain pending hardening outside the primary Phase 3 scope.
