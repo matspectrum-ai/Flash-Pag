@@ -1,0 +1,26 @@
+name: publish-phase3-complete-ttl
+
+on:
+  push:
+    branches:
+      - benchmark/publish-phase3-aa137ea
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout exact Phase 3 completion head
+        uses: actions/checkout@v4
+        with:
+          ref: aa137ea239e1dededc994c7484dd77cd91c21c71
+
+      - name: Build exact read-only preview image
+        run: |
+          set -euo pipefail
+          IMAGE="ttl.sh/flashpag-phase3-aa137ea-20260906:24h"
+          docker build --build-arg VITE_PREVIEW_READ_ONLY=true -t "$IMAGE" .
+          docker push "$IMAGE"
+          echo "Published $IMAGE"
