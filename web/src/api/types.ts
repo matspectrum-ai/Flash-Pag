@@ -251,6 +251,13 @@ export type ProviderConnection = {
   updated_at?: string
 }
 
+export type ProviderConnectionInput = {
+  provider: string
+  label: string
+  credentials?: Record<string, unknown>
+  config?: Record<string, unknown>
+}
+
 export type ApiKey = {
   id: string
   name: string

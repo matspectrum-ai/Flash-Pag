@@ -26,6 +26,8 @@ import type {
   Organization,
   OrganizationAccess,
   PlatformKYCRow,
+  ProviderConnection,
+  ProviderConnectionInput,
   RegisterResult,
   SummaryResponse,
   Transaction,
@@ -158,6 +160,11 @@ export const api = {
   deleteWebhook: (organizationId: string, webhookId: string) =>
     request<void>(withOrganization(`/console/api/webhook-endpoints/${webhookId}`, organizationId), {
       method: 'DELETE',
+    }),
+  createProviderConnection: (organizationId: string, input: ProviderConnectionInput) =>
+    request<ProviderConnection>(withOrganization('/console/api/provider-connections', organizationId), {
+      method: 'POST',
+      body: JSON.stringify(input),
     }),
   testConnection: (connectionId: string, organizationId: string) =>
     request<Record<string, unknown>>(

@@ -33,3 +33,11 @@
 .inactive-connections > div:last-child { border-bottom: 0; }
 @media (max-width: 1120px) { .connection-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 680px) { .connection-card-grid { grid-template-columns: 1fr; } .context-strip { align-items: flex-start; } }
+
+.connection-panel-header { gap: 14px; }
+.connection-panel-actions { display: flex; align-items: center; gap: 9px; }
+.connection-panel-actions .button { min-height: 32px; }
+@media (max-width: 680px) {
+  .connection-panel-header { align-items: flex-start; }
+  .connection-panel-actions { width: 100%; justify-content: space-between; }
+}

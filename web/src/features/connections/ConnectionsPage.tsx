@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
-import { CheckCircle2, CircleAlert, LockKeyhole, RefreshCw } from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { CheckCircle2, CircleAlert, LockKeyhole, Plus, RefreshCw, X } from 'lucide-react'
 import { api } from '../../api/client'
 import type { ProviderConnection } from '../../api/types'
 import { useSession } from '../../app/session'
@@ -25,13 +25,35 @@ function providerName(code: string) {
 
 export function ConnectionsPage() {
   const { organizationId } = useSession()
+  const queryClient = useQueryClient()
   const previewReadOnly = import.meta.env.VITE_PREVIEW_READ_ONLY === 'true'
   const [healthByConnection, setHealthByConnection] = useState<Record<string, ConnectionHealth>>({})
+  const [createOpen, setCreateOpen] = useState(false)
+  const [provider, setProvider] = useState<'mock' | 'pixhub'>('mock')
+  const [label, setLabel] = useState('')
+  const [clientId, setClientId] = useState('')
+  const [clientSecret, setClientSecret] = useState('')
 
   const connectionsQuery = useQuery({
     queryKey: ['provider-connections', organizationId],
     queryFn: () => api.list<ProviderConnection>('provider-connections', organizationId!),
     enabled: Boolean(organizationId),
+  })
+
+  const createMutation = useMutation({
+    mutationFn: () => api.createProviderConnection(organizationId!, {
+      provider,
+      label: label.trim() || (provider === 'mock' ? 'Mock QA' : 'Pixhub'),
+      credentials: provider === 'pixhub' ? { client_id: clientId.trim(), client_secret: clientSecret } : undefined,
+    }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['provider-connections', organizationId] })
+      setCreateOpen(false)
+      setProvider('mock')
+      setLabel('')
+      setClientId('')
+      setClientSecret('')
+    },
   })
 
   const testMutation = useMutation({
@@ -60,9 +82,9 @@ export function ConnectionsPage() {
       </section>
 
       <section className="panel connection-page-panel">
-        <div className="panel-header">
+        <div className="panel-header connection-panel-header">
           <div><h2>Conexões ativas</h2><p>Rotas disponíveis para operações reais da organização.</p></div>
-          <span className="count-pill">{active.length}</span>
+          <div className="connection-panel-actions"><span className="count-pill">{active.length}</span><button className="button button-primary" type="button" disabled={previewReadOnly} onClick={() => setCreateOpen(true)}><Plus size={15} />Nova conexão</button></div>
         </div>
         <div className="connection-card-grid">
           {active.map((connection) => {
@@ -115,6 +137,22 @@ export function ConnectionsPage() {
             ))}
           </div>
         </section>
+      ) : null}
+
+      {createOpen ? (
+        <div className="drawer-backdrop" role="presentation" onMouseDown={() => setCreateOpen(false)}>
+          <aside className="drawer" role="dialog" aria-modal="true" aria-label="Nova conexão" onMouseDown={(event) => event.stopPropagation()}>
+            <div className="drawer-header"><div><span className="eyebrow">Integração</span><h2>Nova conexão</h2></div><button className="icon-button" type="button" onClick={() => setCreateOpen(false)}><X size={18} /></button></div>
+            <form className="financial-form drawer-form" onSubmit={(event) => { event.preventDefault(); createMutation.mutate() }}>
+              <label className="field"><span>Provider</span><select value={provider} onChange={(event) => setProvider(event.target.value as 'mock' | 'pixhub')}><option value="mock">Mock · desenvolvimento</option><option value="pixhub">Pixhub</option></select></label>
+              <label className="field"><span>Nome da conexão</span><input value={label} onChange={(event) => setLabel(event.target.value)} placeholder={provider === 'mock' ? 'Mock QA' : 'Pixhub principal'} /></label>
+              {provider === 'pixhub' ? <><label className="field"><span>Client ID</span><input value={clientId} onChange={(event) => setClientId(event.target.value)} autoComplete="off" /></label><label className="field"><span>Client secret</span><input type="password" value={clientSecret} onChange={(event) => setClientSecret(event.target.value)} autoComplete="new-password" /></label></> : <div className="inline-info">O provider Mock não usa credenciais e existe somente para desenvolvimento e staging.</div>}
+              <div className="inline-info">Credenciais de providers reais são criptografadas no backend e não são exibidas novamente.</div>
+              {createMutation.isError ? <div className="inline-error">{createMutation.error instanceof Error ? createMutation.error.message : 'Falha ao criar conexão.'}</div> : null}
+              <button className="button button-primary button-full" type="submit" disabled={createMutation.isPending || (provider === 'pixhub' && (!clientId.trim() || !clientSecret))}>{createMutation.isPending ? 'Criando…' : 'Criar conexão'}</button>
+            </form>
+          </aside>
+        </div>
       ) : null}
     </div>
   )
