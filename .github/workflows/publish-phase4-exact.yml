@@ -1,0 +1,43 @@
+name: publish-phase4-exact
+
+on:
+  push:
+    branches:
+      - benchmark/publish-phase4-3cb3670
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact Phase 4 checkpoint
+        uses: actions/checkout@v4
+        with:
+          ref: 3cb3670f9b3abc306023d1172a6d6fad6b548c96
+
+      - name: Build and publish exact read-only image
+        shell: bash
+        run: |
+          set -euo pipefail
+          FINAL_IMAGE="ttl.sh/flashpag-phase4-3cb3670-20260907:24h"
+          LEGACY_IMAGE="ttl.sh/flashpag-phase3-dd630ade-20260906:24h"
+          docker build --build-arg VITE_PREVIEW_READ_ONLY=true -t "$FINAL_IMAGE" .
+          docker push "$FINAL_IMAGE"
+          docker tag "$FINAL_IMAGE" "$LEGACY_IMAGE"
+          docker push "$LEGACY_IMAGE"
+
+      - name: Prove both tags resolve to the same image
+        shell: bash
+        run: |
+          set -euo pipefail
+          FINAL_IMAGE="ttl.sh/flashpag-phase4-3cb3670-20260907:24h"
+          LEGACY_IMAGE="ttl.sh/flashpag-phase3-dd630ade-20260906:24h"
+          docker pull "$FINAL_IMAGE"
+          docker pull "$LEGACY_IMAGE"
+          FINAL_ID="$(docker image inspect "$FINAL_IMAGE" --format '{{.Id}}')"
+          LEGACY_ID="$(docker image inspect "$LEGACY_IMAGE" --format '{{.Id}}')"
+          echo "FINAL_IMAGE_ID=$FINAL_ID"
+          echo "LEGACY_IMAGE_ID=$LEGACY_ID"
+          test "$FINAL_ID" = "$LEGACY_ID"
