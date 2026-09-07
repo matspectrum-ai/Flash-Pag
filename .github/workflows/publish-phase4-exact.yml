@@ -15,13 +15,13 @@ jobs:
       - name: Checkout exact Phase 4 checkpoint
         uses: actions/checkout@v4
         with:
-          ref: 3cb3670f9b3abc306023d1172a6d6fad6b548c96
+          ref: 8c2e3929cbe239a4e1abf2f0ed4db02c863dd623
 
       - name: Build and publish exact read-only image
         shell: bash
         run: |
           set -euo pipefail
-          FINAL_IMAGE="ttl.sh/flashpag-phase4-3cb3670-20260907:24h"
+          FINAL_IMAGE="ttl.sh/flashpag-phase4-8c2e392-20260907:24h"
           LEGACY_IMAGE="ttl.sh/flashpag-phase3-dd630ade-20260906:24h"
           docker build --build-arg VITE_PREVIEW_READ_ONLY=true -t "$FINAL_IMAGE" .
           docker push "$FINAL_IMAGE"
@@ -32,7 +32,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          FINAL_IMAGE="ttl.sh/flashpag-phase4-3cb3670-20260907:24h"
+          FINAL_IMAGE="ttl.sh/flashpag-phase4-8c2e392-20260907:24h"
           LEGACY_IMAGE="ttl.sh/flashpag-phase3-dd630ade-20260906:24h"
           docker pull "$FINAL_IMAGE"
           docker pull "$LEGACY_IMAGE"
