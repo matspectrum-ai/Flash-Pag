@@ -56,6 +56,12 @@ export function statusLabel(status?: string) {
     active: 'Ativa',
     disabled: 'Desativada',
     revoked: 'Revogada',
+    draft: 'Rascunho',
+    submitted: 'Enviado',
+    under_review: 'Em análise',
+    needs_changes: 'Correção necessária',
+    approved: 'Aprovado',
+    rejected: 'Recusado',
   }
   return labels[status || ''] || status || '—'
 }

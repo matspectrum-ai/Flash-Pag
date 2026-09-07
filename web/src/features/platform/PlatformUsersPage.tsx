@@ -37,9 +37,9 @@ export function PlatformUsersPage() {
         <article className="metric-card"><div className="metric-label"><ShieldCheck size={16} /><span>Owners / admins</span></div><strong>{privileged}</strong><span className="metric-detail">Vínculos administrativos</span></article>
       </section>
       <section className="panel">
-        <div className="panel-header"><div><h2>Diretório de usuários</h2><p>Os dados refletem memberships da conta comercial; e-mail verificado e último login ainda não possuem contrato administrativo próprio.</p></div><span className="count-pill">{memberships.length}</span></div>
+        <div className="panel-header"><div><h2>Diretório de usuários</h2><p>Os dados refletem vínculos de acesso da conta comercial; e-mail verificado e último login ainda não possuem contrato administrativo próprio.</p></div><span className="count-pill">{memberships.length}</span></div>
         <div className="table-wrap"><table className="data-table platform-users-table"><thead><tr><th>Usuário</th><th>Papel</th><th>Organizações</th></tr></thead><tbody>
-          {memberships.map(({ member, merchant, orgNames }) => <tr key={`${merchant.id}-${member.user_id}`}><td><strong>{member.email || member.user_id}</strong><span className="mono platform-table-subline">{member.user_id}</span></td><td>{roleLabel(member.role)}</td><td>{orgNames.length ? orgNames.join(', ') : 'Sem organização operacional'}</td></tr>)}
+          {memberships.map(({ member, merchant, orgNames }) => <tr key={`${merchant.id}-${member.user_id}`}><td><strong>{member.email || 'Usuário sem e-mail disponível'}</strong></td><td>{roleLabel(member.role)}</td><td>{orgNames.length ? orgNames.join(', ') : 'Sem organização operacional'}</td></tr>)}
           {!memberships.length && !tenantsQuery.isLoading ? <tr><td colSpan={3}><div className="empty-state compact-empty"><Users size={22} /><strong>Nenhum usuário carregado</strong><span>Não há vínculos de acesso no inventário atual.</span></div></td></tr> : null}
         </tbody></table></div>
       </section>
