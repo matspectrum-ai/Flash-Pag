@@ -48,9 +48,9 @@ select option { color: var(--fp-text); background: #151519; }
 .brand-lockup > div:last-child { min-width: 0; display: grid; gap: 1px; }
 .brand-lockup strong { font-size: 14px; line-height: 1.2; letter-spacing: -.01em; }
 .brand-lockup span { color: var(--fp-text-tertiary); font-size: 10.5px; }
-.brand-mark { width: 32px; height: 32px; display: grid; place-items: center; flex: 0 0 auto; }
+.brand-mark { width: 40px; height: 40px; display: grid; place-items: center; flex: 0 0 auto; }
 .brand-mark img { display: block; width: 100%; height: 100%; object-fit: contain; }
-.brand-mark-large { width: 38px; height: 38px; }
+.brand-mark-large { width: 48px; height: 48px; }
 
 .button { min-height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 0 14px; border-radius: 10px; font-size: 12px; font-weight: 680; line-height: 1; cursor: pointer; transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 120ms ease; }
 .button:active:not(:disabled) { transform: translateY(1px); }
