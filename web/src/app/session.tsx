@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, ApiError } from '../api/client'
-import type { MeResponse, Organization, RegisterResult } from '../api/types'
+import type { LoginResult, MeResponse, Organization, RegisterResult } from '../api/types'
 
 type SessionContextValue = {
   me?: MeResponse
@@ -12,7 +12,7 @@ type SessionContextValue = {
   setOrganizationId: (id: string) => void
   refreshMe: () => Promise<void>
   register: (merchantName: string, email: string, password: string) => Promise<RegisterResult>
-  login: (email: string, password: string) => Promise<void>
+  login: (email: string, password: string) => Promise<LoginResult>
   logout: () => Promise<void>
 }
 
@@ -65,8 +65,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }
 
   const login = async (email: string, password: string) => {
-    await loginMutation.mutateAsync({ email, password })
-    await refreshMe()
+    const result = await loginMutation.mutateAsync({ email, password })
+    if (result.ok) await refreshMe()
+    return result
   }
 
   const logout = async () => {

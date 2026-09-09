@@ -18,6 +18,10 @@ import type {
   KYCDocument,
   KYCDocumentType,
   ListResponse,
+  LoginResult,
+  MFAChallenge,
+  MFAEnrollment,
+  MFAStatus,
   MeResponse,
   MemberInput,
   MemberRole,
@@ -32,6 +36,8 @@ import type {
   SummaryResponse,
   Transaction,
   WebhookInput,
+  WithdrawalDestination,
+  WithdrawalDestinationInput,
 } from './types'
 
 export class ApiError extends Error {
@@ -91,11 +97,17 @@ export const api = {
       body: JSON.stringify({ merchant_name: merchantName, organization_name: merchantName, email, password }),
     }),
   login: (email: string, password: string) =>
-    request<{ ok: boolean }>('/console/session', {
+    request<LoginResult>('/console/session', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     }),
   logout: () => request<void>('/console/session', { method: 'DELETE' }),
+  mfaStatus: () => request<MFAStatus>('/console/mfa/status'),
+  mfaEnroll: () => request<MFAEnrollment>('/console/mfa/enroll', { method: 'POST', body: '{}' }),
+  mfaChallenge: (factorId?: string) => request<MFAChallenge>(`/console/mfa/challenge${factorId ? `?factor_id=${encodeURIComponent(factorId)}` : ''}`, { method: 'POST', body: '{}' }),
+  mfaVerify: (input: { factor_id: string; challenge_id?: string; code: string }) => request<{ ok: boolean }>('/console/mfa/verify', { method: 'POST', body: JSON.stringify(input) }),
+  mfaStepUpChallenge: () => request<MFAChallenge>('/console/mfa/step-up/challenge', { method: 'POST', body: '{}' }),
+  mfaStepUpVerify: (input: MFAChallenge & { code: string }) => request<{ ok: boolean }>('/console/mfa/step-up/verify', { method: 'POST', body: JSON.stringify(input) }),
   access: (organizationId: string) =>
     request<OrganizationAccess>(withOrganization('/console/api/access', organizationId)),
   summary: (organizationId: string) =>
@@ -152,6 +164,10 @@ export const api = {
     request<void>(withOrganization(`/console/api/api-keys/${keyId}`, organizationId), {
       method: 'DELETE',
     }),
+  withdrawalDestinations: (organizationId: string) => request<ListResponse<WithdrawalDestination>>(withOrganization('/console/api/withdrawal-destinations', organizationId)),
+  createWithdrawalDestination: (organizationId: string, input: WithdrawalDestinationInput) => request<WithdrawalDestination>(withOrganization('/console/api/withdrawal-destinations', organizationId), { method:'POST', body:JSON.stringify(input) }),
+  disableWithdrawalDestination: (organizationId: string, id: string) => request<void>(withOrganization(`/console/api/withdrawal-destinations/${id}`, organizationId), { method:'DELETE' }),
+  createWithdrawal: (organizationId: string, input: { destination_id: string; amount_minor: number; description?: string; provider?: string }, idempotencyKey: string) => request<Transaction>(withOrganization('/console/api/withdrawals', organizationId), { method:'POST', headers:{'Idempotency-Key':idempotencyKey}, body:JSON.stringify(input) }),
   createWebhook: (organizationId: string, input: WebhookInput) =>
     request<CreatedWebhookEndpoint>(withOrganization('/console/api/webhook-endpoints', organizationId), {
       method: 'POST',

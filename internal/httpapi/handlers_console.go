@@ -26,14 +26,39 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 401, "login_failed", "invalid email/password")
 		return
 	}
-	if expires <= 0 {
-		expires = 3600
+	factors, err := s.sb.ListMFAFactors(r.Context(), token)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, "mfa_status_failed", "could not verify authenticator enrollment")
+		return
 	}
-	http.SetCookie(w, &http.Cookie{Name: "flashpag_session", Value: token, Path: "/", HttpOnly: true, Secure: s.cfg.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: int(expires)})
-	writeJSON(w, 200, map[string]any{"ok": true})
+	verified := ""
+	for _, factor := range factors.TOTP {
+		if factor.Status == "verified" {
+			verified = factor.ID
+			break
+		}
+	}
+	if err := s.setEncryptedCookie(w, mfaPendingCookie, token, int(mfaPendingTTL.Seconds())); err != nil {
+		writeError(w, 500, "mfa_state_failed", "secure authentication state could not be stored")
+		return
+	}
+	if verified == "" {
+		writeJSON(w, 200, map[string]any{"ok": false, "mfa_required": "enroll"})
+		return
+	}
+	challenge, err := s.sb.ChallengeMFA(r.Context(), token, verified)
+	if err != nil || challenge.ID == "" {
+		writeError(w, http.StatusBadGateway, "mfa_challenge_failed", "could not create authenticator challenge")
+		return
+	}
+	_ = expires
+	writeJSON(w, 200, map[string]any{"ok": false, "mfa_required": "challenge", "factor_id": verified, "challenge_id": challenge.ID})
 }
+
 func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{Name: "flashpag_session", Value: "", Path: "/", HttpOnly: true, Secure: s.cfg.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: -1})
+	clearCookie(w, mfaPendingCookie, s.cfg.CookieSecure)
+	clearCookie(w, mfaStepUpCookie, s.cfg.CookieSecure)
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -330,6 +355,17 @@ func (s *Server) consoleOutbound(w http.ResponseWriter, r *http.Request, kind st
 	}
 	in.Currency = normalizeCurrency(in.Currency)
 	in.ProviderCode = normalizeProvider(in.ProviderCode)
+	if kind == "withdrawal" {
+		in.ProviderCode = "pixhub"
+	}
+	if kind == "withdrawal" && strings.TrimSpace(in.DestinationID) != "" {
+		if pixKey, err := s.withdrawalPixKey(r, orgID, strings.TrimSpace(in.DestinationID)); err != nil {
+			writeError(w, http.StatusUnprocessableEntity, "withdrawal_destination_invalid", err.Error())
+			return
+		} else {
+			in.PixKey = pixKey
+		}
+	}
 	key := r.Header.Get("Idempotency-Key")
 	if key == "" {
 		tok, _ := id.Token(16)

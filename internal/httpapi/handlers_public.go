@@ -24,6 +24,7 @@ type chargeRequest struct {
 }
 
 type outboundRequest struct {
+	DestinationID        string `json:"destination_id,omitempty"`
 	AccountID            string `json:"account_id,omitempty"`
 	AmountMinor          int64  `json:"amount_minor"`
 	Currency             string `json:"currency,omitempty"`

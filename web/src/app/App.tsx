@@ -12,6 +12,8 @@ import { WebhooksPage } from '../features/webhooks/WebhooksPage'
 import { DocsPage } from '../features/docs/DocsPage'
 import { KYCPage } from '../features/kyc/KYCPage'
 import { OrganizationPage } from '../features/organization/OrganizationPage'
+import { SecurityPage } from '../features/security/SecurityPage'
+import { WithdrawalsPage } from '../features/withdrawals/WithdrawalsPage'
 import { PlatformDashboardPage } from '../features/platform/PlatformDashboardPage'
 import { PlatformOrganizationsPage } from '../features/platform/PlatformOrganizationsPage'
 import { Organization360Page } from '../features/platform/Organization360Page'
@@ -33,6 +35,7 @@ export function App() {
       <Route index element={<HomePage />} />
       <Route path="transactions" element={<TransactionsPage />} />
       <Route path="accounts" element={<AccountsPage />} />
+      <Route path="withdrawals" element={<WithdrawalsPage />} />
       <Route path="customers" element={<CustomersPage />} />
       <Route path="api-keys" element={<ApiKeysPage />} />
       <Route path="webhooks" element={<WebhooksPage />} />
@@ -40,6 +43,7 @@ export function App() {
       <Route path="kyc" element={<KYCPage />} />
       <Route path="connections" element={<ConnectionsPage />} />
       <Route path="organization" element={<OrganizationPage />} />
+      <Route path="security" element={<SecurityPage />} />
       <Route path="platform" element={<PlatformDashboardPage />} />
       <Route path="platform/organizations" element={<PlatformOrganizationsPage />} />
       <Route path="platform/organizations/:organizationId" element={<Organization360Page />} />

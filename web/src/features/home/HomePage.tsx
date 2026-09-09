@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowDownLeft, ChevronRight, CircleAlert, Network, ReceiptText } from 'lucide-react'
+import { ArrowDownLeft, ChevronRight, CircleAlert, Network, ReceiptText, ShieldCheck } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { api } from '../../api/client'
 import type { ProviderConnection, Transaction } from '../../api/types'
@@ -62,6 +62,7 @@ export function HomePage() {
   const succeeded = recent.filter((item) => item.status === 'succeeded')
   const received = succeeded.reduce((sum, item) => sum + item.amount_minor, 0)
   const attention = recent.filter((item) => item.status === 'pending' || item.status === 'ambiguous')
+  const failed = recent.filter((item) => item.status === 'failed')
   const decided = recent.filter((item) => item.status === 'succeeded' || item.status === 'failed')
   const successRate = decided.length ? Math.round((decided.filter((item) => item.status === 'succeeded').length / decided.length) * 100) : 0
 
@@ -89,7 +90,7 @@ export function HomePage() {
         </div>
 
         <Metric label="Recebido · 7 dias" value={formatBRL(received)} detail="Pix concluídos" icon={<ArrowDownLeft size={16} />} />
-        <Metric label="Pagamentos · 7 dias" value={String(recent.length)} detail={`${succeeded.length} concluído(s)`} icon={<ReceiptText size={16} />} />
+        <Metric label="Transações · 7 dias" value={String(recent.length)} detail={`${succeeded.length} concluído(s) · ${attention.length} pendente(s) · ${failed.length} falha(s)`} icon={<ReceiptText size={16} />} />
         <Metric label="Taxa de sucesso" value={`${successRate}%`} detail={`${attention.length} em acompanhamento`} />
       </section>
 
@@ -141,6 +142,17 @@ export function HomePage() {
             {!activeConnections.length ? <div className="empty-inline">Nenhuma conexão real ativa.</div> : null}
           </div>
           <Link to="/connections" className="button button-secondary button-full">Gerenciar conexões</Link>
+        </aside>
+
+        <aside className="panel operational-summary">
+          <div className="panel-header"><div><h2>Estado operacional</h2><p>O que merece atenção agora.</p></div><CircleAlert size={18} /></div>
+          <div className="operational-list">
+            <div><span>Recebimento Pix</span><strong className={activeConnections.length ? 'state-good' : 'state-warning'}>{activeConnections.length ? 'Operacional' : 'Sem rota ativa'}</strong></div>
+            <div><span>Pendências</span><strong>{attention.length}</strong></div>
+            <div><span>Falhas · 7 dias</span><strong>{failed.length}</strong></div>
+            <div><span>Sucesso · operações decididas</span><strong>{successRate}%</strong></div>
+          </div>
+          {attention.length ? <Link to="/transactions" className="button button-secondary button-full">Revisar pendências</Link> : <div className="operational-ok"><ShieldCheck size={16} /><span>Nenhuma pendência operacional.</span></div>}
         </aside>
       </section>
     </div>

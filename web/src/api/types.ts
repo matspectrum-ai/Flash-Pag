@@ -176,6 +176,32 @@ export type RegisterResult = {
   ok: boolean
   authenticated: boolean
   requires_email_confirmation: boolean
+  mfa_required?: 'enroll' | 'challenge'
+}
+
+export type LoginResult = {
+  ok: boolean
+  mfa_required?: 'enroll' | 'challenge'
+  factor_id?: string
+  challenge_id?: string
+}
+
+export type MFAEnrollment = {
+  factor_id: string
+  friendly_name: string
+  qr_code: string
+  secret: string
+  uri: string
+}
+
+export type MFAStatus = {
+  enabled: boolean
+  factors: Array<{ id: string; type: string; friendly_name: string; status: string }>
+}
+
+export type MFAChallenge = {
+  factor_id: string
+  challenge_id: string
 }
 
 export type Account = {
@@ -220,6 +246,33 @@ export type Transaction = {
   failure_message?: string | null
   created_at: string
   updated_at?: string
+}
+
+export type WithdrawalDestination = {
+  id: string
+  label: string
+  pix_key_type: string
+  pix_key_masked: string
+  bank_name: string
+  branch_last4: string
+  account_last4: string
+  account_type: string
+  is_default: boolean
+  status: string
+  created_at?: string
+  updated_at?: string
+}
+
+export type WithdrawalDestinationInput = {
+  label: string
+  pix_key_type: string
+  pix_key: string
+  bank_name: string
+  branch: string
+  account_number: string
+  account_type: string
+  holder_name?: string
+  holder_document?: string
 }
 
 export type Customer = {

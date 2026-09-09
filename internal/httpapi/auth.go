@@ -4,6 +4,8 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"net/http"
 	"net/url"
 	"strings"
@@ -182,3 +184,78 @@ func parseLimit(v string) string {
 }
 
 var _ = supabase.AuthUser{}
+
+const mfaPendingCookie = "flashpag_mfa_pending"
+const mfaStepUpCookie = "flashpag_mfa_stepup"
+const mfaPendingTTL = 5 * time.Minute
+const mfaStepUpTTL = 10 * time.Minute
+
+type mfaStepUpPayload struct {
+	UserID    string `json:"user_id"`
+	TokenHash string `json:"token_hash"`
+	ExpiresAt int64  `json:"expires_at"`
+}
+
+func (s *Server) setEncryptedCookie(w http.ResponseWriter, name, value string, maxAge int) error {
+	if s.box == nil {
+		return errors.New("APP_MASTER_KEY_B64 is required for secure authentication state")
+	}
+	sealed, err := s.box.Seal([]byte(value))
+	if err != nil {
+		return err
+	}
+	http.SetCookie(w, &http.Cookie{Name: name, Value: sealed, Path: "/", HttpOnly: true, Secure: s.cfg.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: maxAge})
+	return nil
+}
+
+func (s *Server) readEncryptedCookie(r *http.Request, name string) (string, error) {
+	c, err := r.Cookie(name)
+	if err != nil || c.Value == "" || s.box == nil {
+		return "", errors.New("missing secure authentication state")
+	}
+	raw, err := s.box.Open(c.Value)
+	if err != nil {
+		return "", errors.New("invalid secure authentication state")
+	}
+	return string(raw), nil
+}
+
+func clearCookie(w http.ResponseWriter, name string, secure bool) {
+	http.SetCookie(w, &http.Cookie{Name: name, Value: "", Path: "/", HttpOnly: true, Secure: secure, SameSite: http.SameSiteLaxMode, MaxAge: -1})
+}
+
+func tokenHash(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
+}
+
+func (s *Server) setMFAStepUp(w http.ResponseWriter, userID, accessToken string) error {
+	payload, err := json.Marshal(mfaStepUpPayload{UserID: userID, TokenHash: tokenHash(accessToken), ExpiresAt: time.Now().Add(mfaStepUpTTL).Unix()})
+	if err != nil {
+		return err
+	}
+	return s.setEncryptedCookie(w, mfaStepUpCookie, string(payload), int(mfaStepUpTTL.Seconds()))
+}
+
+func (s *Server) hasRecentMFA(r *http.Request, userID, accessToken string) bool {
+	value, err := s.readEncryptedCookie(r, mfaStepUpCookie)
+	if err != nil {
+		return false
+	}
+	var payload mfaStepUpPayload
+	if json.Unmarshal([]byte(value), &payload) != nil {
+		return false
+	}
+	return payload.UserID == userID && payload.TokenHash == tokenHash(accessToken) && time.Now().Unix() < payload.ExpiresAt
+}
+
+func (s *Server) withRecentMFA(next http.HandlerFunc) http.HandlerFunc {
+	return s.withConsoleAuth(func(w http.ResponseWriter, r *http.Request) {
+		c, err := r.Cookie("flashpag_session")
+		if err != nil || c.Value == "" || !s.hasRecentMFA(r, consoleP(r.Context()).UserID, c.Value) {
+			writeError(w, http.StatusPreconditionRequired, "mfa_required", "Google Authenticator verification is required for this action")
+			return
+		}
+		next(w, r)
+	})
+}
