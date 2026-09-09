@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -210,6 +211,13 @@ func (c *Client) authRequest(ctx context.Context, accessToken, method, path stri
 	return nil
 }
 
+func truncateForLog(value string, max int) string {
+	if max <= 0 || len(value) <= max {
+		return value
+	}
+	return value[:max] + "…"
+}
+
 func (c *Client) ListMFAFactors(ctx context.Context, accessToken string) (MFAFactors, error) {
 	// Supabase exposes the server-side factor listing through PostgREST.
 	// The Auth /auth/v1/factors route is not the server-side List Factors API.
@@ -227,6 +235,7 @@ func (c *Client) ListMFAFactors(ctx context.Context, accessToken string) (MFAFac
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		log.Printf("supabase mfa factor list failed: status=%d body=%s", resp.StatusCode, truncateForLog(string(raw), 512))
 		return MFAFactors{}, &Error{Status: resp.StatusCode, Body: string(raw)}
 	}
 	if err := json.Unmarshal(raw, &rows); err != nil {
