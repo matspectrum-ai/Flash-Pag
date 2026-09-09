@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -211,43 +210,19 @@ func (c *Client) authRequest(ctx context.Context, accessToken, method, path stri
 	return nil
 }
 
-func truncateForLog(value string, max int) string {
-	if max <= 0 || len(value) <= max {
-		return value
-	}
-	return value[:max] + "…"
-}
-
 func (c *Client) ListMFAFactors(ctx context.Context, accessToken string) (MFAFactors, error) {
-	// Supabase exposes the server-side factor listing through PostgREST.
-	// The Auth /auth/v1/factors route is not the server-side List Factors API.
-	var rows []MFAFactor
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/rest/v1/auth/factors", nil)
-	if err != nil {
+	// Supabase's documented REST factor endpoint is not exposed by this project's
+	// PostgREST schema. A narrowly scoped SECURITY DEFINER RPC reads only the
+	// current user's verified TOTP factor ID via auth.uid().
+	var factorID string
+	if err := c.authRequest(ctx, accessToken, http.MethodPost, "/rest/v1/rpc/flashpag_verified_totp_factor", map[string]any{}, &factorID); err != nil {
 		return MFAFactors{}, err
 	}
-	req.Header.Set("apikey", c.publishableKey)
-	req.Header.Set("Authorization", "Bearer "+accessToken)
-	resp, err := c.http.Do(req)
-	if err != nil {
-		return MFAFactors{}, err
+	if factorID == "" {
+		return MFAFactors{}, nil
 	}
-	defer resp.Body.Close()
-	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		log.Printf("supabase mfa factor list failed: status=%d body=%s", resp.StatusCode, truncateForLog(string(raw), 512))
-		return MFAFactors{}, &Error{Status: resp.StatusCode, Body: string(raw)}
-	}
-	if err := json.Unmarshal(raw, &rows); err != nil {
-		return MFAFactors{}, fmt.Errorf("decode MFA factors: %w", err)
-	}
-	out := MFAFactors{All: rows}
-	for _, factor := range rows {
-		if strings.EqualFold(factor.Type, "totp") {
-			out.TOTP = append(out.TOTP, factor)
-		}
-	}
-	return out, nil
+	factor := MFAFactor{ID: factorID, Type: "totp", Status: "verified"}
+	return MFAFactors{All: []MFAFactor{factor}, TOTP: []MFAFactor{factor}}, nil
 }
 
 func (c *Client) EnrollTOTP(ctx context.Context, accessToken, friendlyName, issuer string) (MFAEnrollment, error) {
