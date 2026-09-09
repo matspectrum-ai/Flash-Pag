@@ -21,6 +21,8 @@ import {
   Users,
   WalletCards,
   Webhook,
+  Banknote,
+  ShieldCheck,
   X,
 } from 'lucide-react'
 import { api } from '../../api/client'
@@ -32,6 +34,7 @@ const pageMeta: Record<string, { title: string; subtitle?: string }> = {
   '/': { title: 'Início', subtitle: 'Visão financeira e operacional' },
   '/transactions': { title: 'Transações', subtitle: 'Pagamentos Pix recebidos dos clientes desta organização' },
   '/accounts': { title: 'Contas', subtitle: 'Saldo e estrutura financeira da organização' },
+  '/withdrawals': { title: 'Saques', subtitle: 'Saída Pix para o destino bancário cadastrado' },
   '/customers': { title: 'Clientes', subtitle: 'Pagadores e histórico financeiro' },
   '/api-keys': { title: 'API Keys', subtitle: 'Credenciais para integração programática' },
   '/webhooks': { title: 'Webhooks', subtitle: 'Eventos e saúde das entregas' },
@@ -39,6 +42,7 @@ const pageMeta: Record<string, { title: string; subtitle?: string }> = {
   '/kyc': { title: 'Verificação', subtitle: 'KYC/KYB da conta comercial' },
   '/connections': { title: 'Conexões', subtitle: 'Provedores e infraestrutura de pagamento' },
   '/organization': { title: 'Organização', subtitle: 'Contexto, equipe e permissões' },
+  '/security': { title: 'Segurança', subtitle: 'Google Authenticator e autenticação reforçada' },
   '/platform': { title: 'Dashboard', subtitle: 'Financeiro, operação e saúde da plataforma' },
   '/platform/organizations': { title: 'Organizações', subtitle: 'Contas comerciais que operam na Flash Pag' },
   '/platform/users': { title: 'Usuários', subtitle: 'Acessos às contas comerciais da plataforma' },
@@ -97,10 +101,10 @@ export function AppShell() {
   ]
   const merchantGroups = [
     { label: '', items: [{ to: '/', label: 'Início', icon: Home }] },
-    { label: 'Dinheiro', items: [{ to: '/transactions', label: 'Transações', icon: ArrowLeftRight }, { to: '/accounts', label: 'Contas', icon: Landmark }] },
+    { label: 'Dinheiro', items: [{ to: '/transactions', label: 'Transações', icon: ArrowLeftRight }, { to: '/accounts', label: 'Contas', icon: Landmark }, { to: '/withdrawals', label: 'Saques', icon: Banknote }] },
     { label: '', items: [{ to: '/customers', label: 'Clientes', icon: Users }] },
     { label: 'Desenvolvedores', items: developerItems },
-    { label: 'Configurações', items: settingsItems },
+    { label: 'Configurações', items: [...settingsItems, { to: '/security', label: 'Segurança', icon: ShieldCheck }] },
   ]
   const platformGroups = [
     { label: 'Visão geral', items: [{ to: '/platform', label: 'Dashboard', icon: LayoutDashboard }] },
@@ -117,9 +121,9 @@ export function AppShell() {
     ] },
   ]
   const merchantMoreGroups = [
-    { label: 'Financeiro', items: [{ to: '/accounts', label: 'Contas', icon: Landmark }] },
+    { label: 'Financeiro', items: [{ to: '/accounts', label: 'Contas', icon: Landmark }, { to: '/withdrawals', label: 'Saques', icon: Banknote }] },
     { label: 'Desenvolvedores', items: developerItems },
-    { label: 'Configurações', items: settingsItems },
+    { label: 'Configurações', items: [...settingsItems, { to: '/security', label: 'Segurança', icon: ShieldCheck }] },
   ]
   const platformMoreGroups = [
     { label: 'Operação', items: [{ to: '/platform/users', label: 'Usuários', icon: Users }, { to: '/platform/balances', label: 'Saldos', icon: WalletCards }] },

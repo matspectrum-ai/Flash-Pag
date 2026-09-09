@@ -6,6 +6,8 @@ import type { ApiKey, CreatedApiKey } from '../../api/types'
 import { useSession } from '../../app/session'
 import { formatDateTime } from '../../lib/format'
 import { StatusBadge } from '../../components/ui/StatusBadge'
+import { MFAActionDialog } from '../../components/security/MFAActionDialog'
+import { ApiError } from '../../api/client'
 
 const availableScopes = [
   ['pix:read', 'Ler pagamentos Pix'],
@@ -26,6 +28,9 @@ export function ApiKeysPage() {
   const [created, setCreated] = useState<CreatedApiKey | null>(null)
   const [revokeCandidate, setRevokeCandidate] = useState<ApiKey | null>(null)
   const [copied, setCopied] = useState(false)
+  const [stepUpOpen, setStepUpOpen] = useState(false)
+  const [stepUpAction, setStepUpAction] = useState<'create' | 'revoke' | null>(null)
+  const [pendingRevoke, setPendingRevoke] = useState<ApiKey | null>(null)
 
   const accessQuery = useQuery({
     queryKey: ['access', organizationId],
@@ -40,6 +45,7 @@ export function ApiKeysPage() {
 
   const createMutation = useMutation({
     mutationFn: () => api.createAPIKey(organizationId!, { name: name.trim(), scopes }),
+    onError: (error) => { if (error instanceof ApiError && error.status === 428) startCreate() },
     onSuccess: (key) => {
       setCreated(key)
       setCreating(false)
@@ -51,6 +57,7 @@ export function ApiKeysPage() {
 
   const revokeMutation = useMutation({
     mutationFn: (key: ApiKey) => api.revokeAPIKey(organizationId!, key.id),
+    onError: (error) => { if (error instanceof ApiError && error.status === 428) startRevoke(revokeCandidate || pendingRevoke!) },
     onSuccess: () => {
       setRevokeCandidate(null)
       void queryClient.invalidateQueries({ queryKey: ['api-keys', organizationId] })
@@ -60,6 +67,15 @@ export function ApiKeysPage() {
   const submit = (event: FormEvent) => {
     event.preventDefault()
     if (name.trim() && scopes.length && !previewReadOnly && accessQuery.data?.can_manage) createMutation.mutate()
+  }
+
+  function startCreate() { setStepUpAction('create'); setStepUpOpen(true) }
+  function startRevoke(key: ApiKey) { setPendingRevoke(key); setStepUpAction('revoke'); setStepUpOpen(true) }
+  function completeStepUp() {
+    setStepUpOpen(false)
+    if (stepUpAction === 'create') createMutation.mutate()
+    if (stepUpAction === 'revoke' && pendingRevoke) revokeMutation.mutate(pendingRevoke)
+    setStepUpAction(null)
   }
 
   const copySecret = async () => {
@@ -110,7 +126,7 @@ export function ApiKeysPage() {
               <label className="field"><span>Nome</span><input value={name} onChange={(event) => setName(event.target.value)} placeholder="Ex.: Backend produção" autoFocus /></label>
               <fieldset className="scope-fieldset"><legend>Permissões</legend>{availableScopes.map(([scope, label]) => <label className="scope-option" key={scope}><input type="checkbox" checked={scopes.includes(scope)} onChange={(event) => setScopes((current) => event.target.checked ? [...current, scope] : current.filter((item) => item !== scope))} /><span><strong>{label}</strong><code>{scope}</code></span></label>)}</fieldset>
               {previewReadOnly ? <div className="inline-info">No preview a criação de credenciais está bloqueada.</div> : null}
-              {createMutation.isError ? <div className="inline-error">{createMutation.error instanceof Error ? createMutation.error.message : 'Não foi possível criar a chave.'}</div> : null}
+              {createMutation.isError && !(createMutation.error instanceof ApiError && createMutation.error.status === 428) ? <div className="inline-error">{createMutation.error instanceof Error ? createMutation.error.message : 'Não foi possível criar a chave.'}</div> : null}
               <button className="button button-primary button-full" type="submit" disabled={previewReadOnly || createMutation.isPending || !name.trim() || !scopes.length}>{previewReadOnly ? 'Bloqueado no preview' : createMutation.isPending ? 'Criando…' : 'Criar API Key'}</button>
             </form>
           </aside>
@@ -130,9 +146,10 @@ export function ApiKeysPage() {
 
       {revokeCandidate ? (
         <div className="drawer-backdrop" role="presentation" onMouseDown={() => setRevokeCandidate(null)}>
-          <aside className="confirm-sheet" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}><ShieldAlert size={23} /><div><h2>Revogar {revokeCandidate.name}?</h2><p>Integrações usando esta chave deixarão de autenticar imediatamente.</p></div>{previewReadOnly ? <div className="inline-info">Revogação bloqueada no preview.</div> : null}<div className="confirm-actions"><button className="button button-quiet" type="button" onClick={() => setRevokeCandidate(null)}>Cancelar</button><button className="button button-danger" type="button" disabled={previewReadOnly || revokeMutation.isPending} onClick={() => revokeMutation.mutate(revokeCandidate)}>{revokeMutation.isPending ? 'Revogando…' : 'Revogar chave'}</button></div></aside>
+          <aside className="confirm-sheet" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}><ShieldAlert size={23} /><div><h2>Revogar {revokeCandidate.name}?</h2><p>Integrações usando esta chave deixarão de autenticar imediatamente.</p></div>{previewReadOnly ? <div className="inline-info">Revogação bloqueada no preview.</div> : null}<div className="confirm-actions"><button className="button button-quiet" type="button" onClick={() => setRevokeCandidate(null)}>Cancelar</button><button className="button button-danger" type="button" disabled={previewReadOnly || revokeMutation.isPending} onClick={() => startRevoke(revokeCandidate)}>{revokeMutation.isPending ? 'Revogando…' : 'Revogar chave'}</button></div></aside>
         </div>
       ) : null}
+      <MFAActionDialog open={stepUpOpen} title={stepUpAction === 'revoke' ? 'Confirme a revogação' : 'Confirme a criação da API Key'} description={stepUpAction === 'revoke' ? 'A revogação de uma credencial interrompe a autenticação da integração.' : 'A nova credencial poderá acessar os escopos selecionados nesta organização.'} onClose={() => { setStepUpOpen(false); setStepUpAction(null) }} onVerified={completeStepUp} />
     </div>
   )
 }

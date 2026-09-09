@@ -142,6 +142,100 @@ func (c *Client) PasswordLogin(ctx context.Context, email, password string) (acc
 	return v.AccessToken, v.ExpiresIn, nil
 }
 
+type MFAFactor struct {
+	ID           string `json:"id"`
+	Type         string `json:"type"`
+	Status       string `json:"status"`
+	FriendlyName string `json:"friendly_name"`
+}
+
+type MFAFactors struct {
+	All  []MFAFactor `json:"all"`
+	TOTP []MFAFactor `json:"totp"`
+}
+
+type MFAEnrollment struct {
+	ID           string `json:"id"`
+	Type         string `json:"type"`
+	FriendlyName string `json:"friendly_name"`
+	TOTP         struct {
+		QRCode string `json:"qr_code"`
+		Secret string `json:"secret"`
+		URI    string `json:"uri"`
+	} `json:"totp"`
+}
+
+type MFAChallenge struct {
+	ID string `json:"id"`
+}
+
+type MFASession struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresIn    int64  `json:"expires_in"`
+}
+
+func (c *Client) authRequest(ctx context.Context, accessToken, method, path string, body any, out any) error {
+	var r io.Reader
+	if body != nil {
+		b, err := json.Marshal(body)
+		if err != nil {
+			return err
+		}
+		r = bytes.NewReader(b)
+	}
+	req, err := http.NewRequestWithContext(ctx, method, c.baseURL+path, r)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("apikey", c.publishableKey)
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return &Error{Status: resp.StatusCode, Body: string(raw)}
+	}
+	if out != nil && len(raw) > 0 {
+		if err := json.Unmarshal(raw, out); err != nil {
+			return fmt.Errorf("decode auth response: %w", err)
+		}
+	}
+	return nil
+}
+
+func (c *Client) ListMFAFactors(ctx context.Context, accessToken string) (MFAFactors, error) {
+	var out MFAFactors
+	err := c.authRequest(ctx, accessToken, http.MethodGet, "/auth/v1/factors", nil, &out)
+	return out, err
+}
+
+func (c *Client) EnrollTOTP(ctx context.Context, accessToken, friendlyName, issuer string) (MFAEnrollment, error) {
+	var out MFAEnrollment
+	body := map[string]string{"factor_type": "totp", "friendly_name": friendlyName, "issuer": issuer}
+	err := c.authRequest(ctx, accessToken, http.MethodPost, "/auth/v1/factors", body, &out)
+	return out, err
+}
+
+func (c *Client) ChallengeMFA(ctx context.Context, accessToken, factorID string) (MFAChallenge, error) {
+	var out MFAChallenge
+	err := c.authRequest(ctx, accessToken, http.MethodPost, "/auth/v1/factors/"+url.PathEscape(factorID)+"/challenge", nil, &out)
+	return out, err
+}
+
+func (c *Client) VerifyMFA(ctx context.Context, accessToken, factorID, challengeID, code string) (MFASession, error) {
+	var out MFASession
+	body := map[string]string{"challenge_id": challengeID, "code": code}
+	err := c.authRequest(ctx, accessToken, http.MethodPost, "/auth/v1/factors/"+url.PathEscape(factorID)+"/verify", body, &out)
+	return out, err
+}
+
 func (c *Client) SignUp(ctx context.Context, email, password string) (SignUpResult, error) {
 	payload := map[string]string{"email": strings.TrimSpace(email), "password": password}
 	b, _ := json.Marshal(payload)

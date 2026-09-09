@@ -44,6 +44,12 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /console/register", s.register)
 	s.mux.HandleFunc("POST /console/session", s.login)
 	s.mux.HandleFunc("DELETE /console/session", s.logout)
+	s.mux.HandleFunc("GET /console/mfa/status", s.withConsoleAuth(s.consoleMFAStatus))
+	s.mux.HandleFunc("POST /console/mfa/enroll", s.consoleMFAEnroll)
+	s.mux.HandleFunc("POST /console/mfa/challenge", s.consoleMFAChallenge)
+	s.mux.HandleFunc("POST /console/mfa/verify", s.consoleMFAVerify)
+	s.mux.HandleFunc("POST /console/mfa/step-up/challenge", s.withConsoleAuth(s.consoleMFAStepUpChallenge))
+	s.mux.HandleFunc("POST /console/mfa/step-up/verify", s.withConsoleAuth(s.consoleMFAStepUpVerify))
 
 	// Private application API. The /console prefix is retained during the React migration
 	// as an implementation detail and is not exposed as product terminology in the UI.
@@ -73,15 +79,18 @@ func (s *Server) routes() {
 
 	s.mux.HandleFunc("GET /console/api/{resource}", s.withConsoleAuth(s.consoleList))
 	s.mux.HandleFunc("POST /console/api/customers", s.withConsoleAuth(s.consoleCreateCustomer))
-	s.mux.HandleFunc("POST /console/api/api-keys", s.withConsoleAuth(s.consoleCreateAPIKey))
-	s.mux.HandleFunc("DELETE /console/api/api-keys/{id}", s.withConsoleAuth(s.consoleRevokeAPIKey))
+	s.mux.HandleFunc("POST /console/api/api-keys", s.withRecentMFA(s.consoleCreateAPIKey))
+	s.mux.HandleFunc("DELETE /console/api/api-keys/{id}", s.withRecentMFA(s.consoleRevokeAPIKey))
 	s.mux.HandleFunc("POST /console/api/provider-connections", s.withConsoleAuth(s.withKYCApprovedConsole(s.consoleCreateProviderConnection)))
 	s.mux.HandleFunc("POST /console/api/provider-connections/{id}/test", s.withConsoleAuth(s.consoleTestProviderConnection))
 	s.mux.HandleFunc("POST /console/api/transactions/{id}/reconcile", s.withConsoleAuth(s.consoleReconcileTransaction))
 	s.mux.HandleFunc("POST /console/api/webhook-endpoints", s.withConsoleAuth(s.consoleCreateWebhook))
 	s.mux.HandleFunc("DELETE /console/api/webhook-endpoints/{id}", s.withConsoleAuth(s.consoleDeleteWebhook))
 	s.mux.HandleFunc("POST /console/api/transfers", s.withConsoleAuth(s.withKYCApprovedConsole(s.consoleCreateTransfer)))
-	s.mux.HandleFunc("POST /console/api/withdrawals", s.withConsoleAuth(s.withKYCApprovedConsole(s.consoleCreateWithdrawal)))
+	s.mux.HandleFunc("GET /console/api/withdrawal-destinations", s.withConsoleAuth(s.consoleWithdrawalDestinations))
+	s.mux.HandleFunc("POST /console/api/withdrawal-destinations", s.withRecentMFA(s.withKYCApprovedConsole(s.consoleCreateWithdrawalDestination)))
+	s.mux.HandleFunc("DELETE /console/api/withdrawal-destinations/{id}", s.withRecentMFA(s.withKYCApprovedConsole(s.consoleDeleteWithdrawalDestination)))
+	s.mux.HandleFunc("POST /console/api/withdrawals", s.withRecentMFA(s.withKYCApprovedConsole(s.consoleCreateWithdrawal)))
 
 	// Platform administration.
 	s.mux.HandleFunc("GET /console/api/admin/tenants", s.withAdmin(s.adminTenantInventory))

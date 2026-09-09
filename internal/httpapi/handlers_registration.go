@@ -70,12 +70,11 @@ func (s *Server) register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if signup.AccessToken != "" {
-		expires := signup.ExpiresIn
-		if expires <= 0 {
-			expires = 3600
+		if err := s.setEncryptedCookie(w, mfaPendingCookie, signup.AccessToken, int(mfaPendingTTL.Seconds())); err != nil {
+			writeError(w, http.StatusInternalServerError, "mfa_state_failed", "secure authentication state could not be stored")
+			return
 		}
-		http.SetCookie(w, &http.Cookie{Name: "flashpag_session", Value: signup.AccessToken, Path: "/", HttpOnly: true, Secure: s.cfg.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: int(expires)})
-		writeJSON(w, http.StatusCreated, map[string]any{"ok": true, "authenticated": true, "requires_email_confirmation": false})
+		writeJSON(w, http.StatusCreated, map[string]any{"ok": true, "authenticated": false, "requires_email_confirmation": false, "mfa_required": "enroll"})
 		return
 	}
 	writeJSON(w, http.StatusAccepted, map[string]any{"ok": true, "authenticated": false, "requires_email_confirmation": signup.NeedsConfirm})

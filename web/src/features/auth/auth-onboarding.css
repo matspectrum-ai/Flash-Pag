@@ -58,3 +58,12 @@
   .auth-form-panel { padding: 22px 16px 34px; }
   .auth-card-header h2 { font-size: 23px; }
 }
+
+
+.mfa-auth-flow { display: grid; gap: 18px; }
+.mfa-qr { width: 220px; height: 220px; margin: 0 auto; padding: 12px; border-radius: 16px; background: #fff; display: grid; place-items: center; }
+.mfa-qr img { width: 100%; height: 100%; display: block; }
+.mfa-secret { display: grid; gap: 6px; padding: 12px 14px; border: 1px solid var(--border, #29292f); border-radius: 12px; background: rgba(255,255,255,.02); }
+.mfa-secret span { color: var(--muted, #8d8d98); font-size: 12px; }
+.mfa-secret code { overflow-wrap: anywhere; font-size: 12px; letter-spacing: .08em; }
+.mfa-step-icon { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; background: rgba(116, 92, 255, .12); color: #a99cff; }
