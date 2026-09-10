@@ -101,6 +101,7 @@ func applyMFATestSchema(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 	root := filepath.Clean(filepath.Join(filepath.Dir(thisFile), "..", ".."))
 	for _, stmt := range []string{
 		`create extension if not exists pgcrypto;`,
+		`do $$ begin if not exists (select 1 from pg_roles where rolname = 'service_role') then create role service_role nologin; end if; if not exists (select 1 from pg_roles where rolname = 'anon') then create role anon nologin; end if; if not exists (select 1 from pg_roles where rolname = 'authenticated') then create role authenticated nologin; end if; end $$;`,
 		`create table app_users (id uuid primary key, username text not null, username_normalized text not null unique, status text not null);`,
 		`create table app_sessions (id uuid primary key default gen_random_uuid(), user_id uuid not null, token_hash text not null unique, expires_at timestamptz not null, last_seen_at timestamptz not null, revoked_at timestamptz, aal text not null default 'aal1', mfa_verified_at timestamptz);`,
 		`create table app_totp_factors (user_id uuid primary key, secret_ciphertext text not null, issuer text not null, account_label text not null, enabled_at timestamptz, disabled_at timestamptz, last_used_step bigint, last_used_at timestamptz, updated_at timestamptz default now());`,
