@@ -95,7 +95,10 @@ begin
     and c.key_id = p_key_id
   for update;
 
-  if kit_status <> 'active' or challenge_status <> 'consuming' or challenge_expires_at <= now() then
+  if kit_status is distinct from 'active'
+     or challenge_status is distinct from 'consuming'
+     or challenge_expires_at is null
+     or challenge_expires_at <= now() then
     return false;
   end if;
 
