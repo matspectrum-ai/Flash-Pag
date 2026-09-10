@@ -23,6 +23,12 @@ type Config struct {
 }
 
 func Load() (Config, error) {
+	firstPartyAuthEnabled := strings.EqualFold(env("APP_FIRST_PARTY_AUTH_ENABLED", "false"), "true")
+	cookieSecureDefault := "false"
+	if firstPartyAuthEnabled {
+		cookieSecureDefault = "true"
+	}
+
 	cfg := Config{
 		Addr:                   env("APP_ADDR", ":8080"),
 		PublicURL:              strings.TrimRight(env("APP_PUBLIC_URL", "http://localhost:8080"), "/"),
@@ -30,8 +36,8 @@ func Load() (Config, error) {
 		SupabaseSecretKey:      os.Getenv("SUPABASE_SECRET_KEY"),
 		SupabasePublishableKey: os.Getenv("SUPABASE_PUBLISHABLE_KEY"),
 		DatabaseURL:            strings.TrimSpace(os.Getenv("DATABASE_URL")),
-		FirstPartyAuthEnabled:  strings.EqualFold(env("APP_FIRST_PARTY_AUTH_ENABLED", "false"), "true"),
-		CookieSecure:           strings.EqualFold(env("COOKIE_SECURE", "false"), "true"),
+		FirstPartyAuthEnabled:  firstPartyAuthEnabled,
+		CookieSecure:           strings.EqualFold(env("COOKIE_SECURE", cookieSecureDefault), "true"),
 		PreviewReadOnly:        strings.EqualFold(env("APP_PREVIEW_READ_ONLY", "false"), "true"),
 		WebhookPollInterval:    5 * time.Second,
 	}
