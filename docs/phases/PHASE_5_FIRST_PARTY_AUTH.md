@@ -57,11 +57,12 @@ Implemented MFA foundation:
 - step-up consumes the accepted timestep and elevates the same AAL1 session to AAL2 inside a PostgreSQL atomic operation;
 - session introspection carries MFA verification state and recent-MFA freshness is enforced by the first-party AAL2 middleware helper;
 - disposable PostgreSQL CI infrastructure is configured and a concurrency test executes the production migration functions against a real PostgreSQL instance;
-- first-party authentication mutations enforce same-origin requests when browsers supply the `Origin` header, with `SameSite=Lax` retained on the session cookie.
+- first-party authentication mutations enforce same-origin requests when browsers supply the `Origin` header, with `SameSite=Lax` retained on the session cookie;
+- migration `0022_first_party_membership_links.sql` adds first-party identity bridges for merchant memberships and platform-admin relationships, backfills them from the existing compatibility mapping, and exposes service-role-only first-party authorization read functions.
 
 Not yet complete:
 - first-party recovery migration;
-- migration of memberships/platform-admin relationships from `auth.users` to `app_users`;
+- completion of membership/platform-admin runtime authorization cutover from legacy `auth.users` identifiers;
 - integration of first-party AAL2/recent-MFA authorization into the eventual financial/configuration cutover;
 - end-to-end account migration/re-enrollment flow for existing users;
 - final production cutover validation.
@@ -70,7 +71,7 @@ Existing Supabase TOTP secrets must not be extracted. Existing users must enter 
 
 ### Stage 4 — Domain/user FK migration
 
-Move membership and platform-admin relationships from `auth.users` to `app_users` while preserving UUID identity values. Update affected SQL functions and Go data access accordingly. Remove runtime reads from `auth.users`.
+Continue the bridge established by migration `0022_first_party_membership_links.sql`: migrate membership and platform-admin runtime reads and writes from `auth.users` identifiers to `app_users` while preserving UUID identity values. Update affected SQL functions and Go data access accordingly. Remove runtime reads from `auth.users` only after dual-path validation is complete.
 
 ### Stage 5 — Cutover and cleanup
 
