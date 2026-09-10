@@ -54,13 +54,13 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /docs", s.docs)
 	s.mux.HandleFunc("GET /openapi.yaml", s.openapi)
 
-	s.mux.HandleFunc("POST /auth/login", s.firstPartyLogin)
-	s.mux.HandleFunc("POST /auth/logout", s.firstPartyLogout)
+	s.mux.HandleFunc("POST /auth/login", s.withFirstPartyOrigin(s.firstPartyLogin))
+	s.mux.HandleFunc("POST /auth/logout", s.withFirstPartyOrigin(s.firstPartyLogout))
 	s.mux.HandleFunc("GET /auth/me", s.firstPartyMe)
 	s.mux.HandleFunc("GET /auth/mfa/status", s.withFirstPartyAuth(s.firstPartyMFAStatus))
-	s.mux.HandleFunc("POST /auth/mfa/enroll", s.withFirstPartyAuth(s.firstPartyMFAEnroll))
-	s.mux.HandleFunc("POST /auth/mfa/enroll/verify", s.withFirstPartyAuth(s.firstPartyMFAEnrollVerify))
-	s.mux.HandleFunc("POST /auth/mfa/step-up", s.withFirstPartyAuth(s.firstPartyMFAStepUp))
+	s.mux.HandleFunc("POST /auth/mfa/enroll", s.withFirstPartyOrigin(s.withFirstPartyAuth(s.firstPartyMFAEnroll)))
+	s.mux.HandleFunc("POST /auth/mfa/enroll/verify", s.withFirstPartyOrigin(s.withFirstPartyAuth(s.firstPartyMFAEnrollVerify)))
+	s.mux.HandleFunc("POST /auth/mfa/step-up", s.withFirstPartyOrigin(s.withFirstPartyAuth(s.firstPartyMFAStepUp)))
 
 	s.mux.HandleFunc("POST /console/register", s.register)
 	s.mux.HandleFunc("POST /console/session", s.login)
