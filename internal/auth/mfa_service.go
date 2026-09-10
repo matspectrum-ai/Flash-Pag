@@ -2,7 +2,6 @@ package auth
 
 import (
 	"context"
-	"crypto/subtle"
 	"errors"
 	"time"
 
@@ -10,11 +9,11 @@ import (
 )
 
 var (
-	ErrMFANotEnrolled = errors.New("mfa not enrolled")
+	ErrMFANotEnrolled     = errors.New("mfa not enrolled")
 	ErrMFAAlreadyEnrolled = errors.New("mfa already enrolled")
-	ErrMFAInvalidCode = errors.New("invalid mfa code")
-	ErrMFAReplay = errors.New("mfa code already used")
-	ErrMFAInvalidSession = errors.New("invalid mfa session")
+	ErrMFAInvalidCode     = errors.New("invalid mfa code")
+	ErrMFAReplay          = errors.New("mfa code already used")
+	ErrMFAInvalidSession  = errors.New("invalid mfa session")
 )
 
 type MFAStore interface {
@@ -26,12 +25,12 @@ type MFAStore interface {
 }
 
 type TOTPFactor struct {
-	UserID         string
+	UserID           string
 	SecretCiphertext string
-	Issuer         string
-	AccountLabel   string
-	Enabled        bool
-	LastUsedStep   *int64
+	Issuer           string
+	AccountLabel     string
+	Enabled          bool
+	LastUsedStep     *int64
 }
 
 type MFAService struct {
@@ -107,24 +106,13 @@ func (s *MFAService) VerifyAndElevate(ctx context.Context, userID, tokenHash, co
 	}
 	verifiedAt := s.now()
 	if err := s.store.ConsumeTOTPCode(ctx, userID, step, verifiedAt); err != nil {
-		return mapMFAConsumeError(err)
+		if errors.Is(err, ErrMFAReplay) {
+			return ErrMFAReplay
+		}
+		return err
 	}
 	if err := s.store.ElevateSession(ctx, tokenHash, verifiedAt); err != nil {
 		return ErrMFAInvalidSession
 	}
 	return nil
-}
-
-func mapMFAConsumeError(err error) error {
-	if errors.Is(err, ErrMFAReplay) {
-		return ErrMFAReplay
-	}
-	return err
-}
-
-func equalCode(a, b string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
 }
