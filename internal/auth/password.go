@@ -43,28 +43,39 @@ func VerifyPassword(password, encoded string) (bool, error) {
 	if len(parts) != 6 || parts[1] != "argon2id" {
 		return false, errors.New("unsupported password hash")
 	}
-	version, err := parseUint(parts[2], "v")
+	version, err := parseParam(parts[2], "v")
 	if err != nil || version != argon2.Version {
 		return false, errors.New("unsupported argon2 version")
 	}
-	memory, err := parseUint(parts[3], "m")
+	params := strings.Split(parts[3], ",")
+	if len(params) != 3 {
+		return false, errors.New("malformed argon2 parameters")
+	}
+	memory, err := parseParam(params[0], "m")
 	if err != nil || memory != argon2MemoryKiB {
 		return false, errors.New("unsupported argon2 memory cost")
 	}
-	iterations, err := parseUint(parts[4], "t")
+	iterations, err := parseParam(params[1], "t")
 	if err != nil || iterations != argon2Iterations {
 		return false, errors.New("unsupported argon2 iteration count")
 	}
-	threads, err := parseUint(parts[5], "p")
+	threads, err := parseParam(params[2], "p")
 	if err != nil || threads != argon2Threads {
 		return false, errors.New("unsupported argon2 parallelism")
 	}
-	// This format intentionally encodes the salt and digest as separate fields after the
-	// parameter field; reject malformed hashes rather than accepting ambiguous encodings.
-	return false, errors.New("malformed argon2 hash")
+	enc := base64.RawStdEncoding
+	salt, err := enc.DecodeString(parts[4])
+	if err != nil || len(salt) != argon2SaltLength {
+		return false, errors.New("malformed argon2 salt")
+	}
+	want, err := enc.DecodeString(parts[5])
+	if err != nil || len(want) != argon2KeyLength {
+		return false, errors.New("malformed argon2 digest")
+	}
+	return verifyDigest(password, salt, want), nil
 }
 
-func parseUint(value, key string) (uint64, error) {
+func parseParam(value, key string) (uint64, error) {
 	prefix := key + "="
 	if !strings.HasPrefix(value, prefix) {
 		return 0, errors.New("missing parameter")
