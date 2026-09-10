@@ -4,13 +4,10 @@ import (
 	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha1"
-	"crypto/sha256"
-	"crypto/sha512"
 	"encoding/base32"
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"hash"
 	"net/url"
 	"strconv"
 	"strings"
@@ -73,7 +70,7 @@ func VerifyTOTP(secret, code string, now time.Time) (int64, bool, error) {
 		if step < 0 {
 			continue
 		}
-		if constantTimeCodeEqual(totpCode(decoded, step, sha1.New), code) {
+		if constantTimeCodeEqual(totpCode(decoded, step), code) {
 			return step, true, nil
 		}
 	}
@@ -95,10 +92,10 @@ func decodeTOTPSecret(secret string) ([]byte, error) {
 	return decoded, nil
 }
 
-func totpCode(secret []byte, step int64, hashFactory func() hash.Hash) string {
+func totpCode(secret []byte, step int64) string {
 	var counter [8]byte
 	binary.BigEndian.PutUint64(counter[:], uint64(step))
-	mac := hmac.New(hashFactory, secret)
+	mac := hmac.New(sha1.New, secret)
 	_, _ = mac.Write(counter[:])
 	sum := mac.Sum(nil)
 	offset := sum[len(sum)-1] & 0x0f
@@ -106,8 +103,7 @@ func totpCode(secret []byte, step int64, hashFactory func() hash.Hash) string {
 		(uint32(sum[offset+1]) << 16) |
 		(uint32(sum[offset+2]) << 8) |
 		uint32(sum[offset+3])
-	code := value % 1000000
-	return fmt.Sprintf("%06d", code)
+	return fmt.Sprintf("%06d", value%1000000)
 }
 
 func constantTimeCodeEqual(got, want string) bool {
@@ -120,8 +116,3 @@ func constantTimeCodeEqual(got, want string) bool {
 	}
 	return diff == 0
 }
-
-// Keep the supported hash implementations linked while the persistence model
-// stores the algorithm explicitly for future factor-format evolution.
-var _ = sha256.New
-var _ = sha512.New
