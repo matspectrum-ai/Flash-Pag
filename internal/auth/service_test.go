@@ -11,6 +11,7 @@ type memoryStore struct {
 	users       map[string]User
 	credentials map[string]Credential
 	sessions    map[string]sessionRow
+	rates       map[string]rateRow
 }
 
 type sessionRow struct {
@@ -19,11 +20,18 @@ type sessionRow struct {
 	revokedAt *time.Time
 }
 
+type rateRow struct {
+	failures     int
+	windowStart  time.Time
+	blockedUntil *time.Time
+}
+
 func newMemoryStore() *memoryStore {
 	return &memoryStore{
 		users:       map[string]User{},
 		credentials: map[string]Credential{},
 		sessions:    map[string]sessionRow{},
+		rates:       map[string]rateRow{},
 	}
 }
 
@@ -80,6 +88,36 @@ func (m *memoryStore) FindSessionUser(_ context.Context, tokenHash string, now t
 	return User{}, errors.New("user not found")
 }
 
+func (m *memoryStore) AllowLogin(_ context.Context, keyHash, _, _ string, now time.Time) (bool, error) {
+	row, ok := m.rates[keyHash]
+	if !ok || !now.Before(row.windowStart.Add(loginRateWindow)) {
+		return true, nil
+	}
+	if row.blockedUntil != nil && now.Before(*row.blockedUntil) {
+		return false, nil
+	}
+	return true, nil
+}
+
+func (m *memoryStore) RecordLoginFailure(_ context.Context, keyHash, _, _ string, now time.Time) error {
+	row, ok := m.rates[keyHash]
+	if !ok || !now.Before(row.windowStart.Add(loginRateWindow)) {
+		row = rateRow{windowStart: now}
+	}
+	row.failures++
+	if row.failures >= loginRateLimit {
+		blocked := now.Add(loginBlockPeriod)
+		row.blockedUntil = &blocked
+	}
+	m.rates[keyHash] = row
+	return nil
+}
+
+func (m *memoryStore) ResetLoginFailures(_ context.Context, keyHash string) error {
+	delete(m.rates, keyHash)
+	return nil
+}
+
 func TestNormalizeUsername(t *testing.T) {
 	got, err := NormalizeUsername("  Mateus.Silva  ")
 	if err != nil || got != "mateus.silva" {
@@ -132,5 +170,24 @@ func TestServiceRegisterAndAuthenticate(t *testing.T) {
 	}
 	if _, err := service.AuthenticateSession(context.Background(), token); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("revoked session error = %v", err)
+	}
+}
+
+func TestServiceRateLimitBlocksAfterFiveFailures(t *testing.T) {
+	store := newMemoryStore()
+	service := NewService(store)
+	if _, err := service.Register(context.Background(), "mateus", "correct horse battery staple"); err != nil {
+		t.Fatal(err)
+	}
+	fixedNow := time.Date(2026, 9, 10, 15, 0, 0, 0, time.UTC)
+	service.now = func() time.Time { return fixedNow }
+	for i := 0; i < loginRateLimit; i++ {
+		_, _, _, err := service.Authenticate(context.Background(), "mateus", "wrong password", "ip", "ua")
+		if !errors.Is(err, ErrInvalidCredentials) {
+			t.Fatalf("failure %d error = %v", i+1, err)
+		}
+	}
+	if _, _, _, err := service.Authenticate(context.Background(), "mateus", "correct horse battery staple", "ip", "ua"); !errors.Is(err, ErrTooManyAttempts) {
+		t.Fatalf("blocked login error = %v", err)
 	}
 }
