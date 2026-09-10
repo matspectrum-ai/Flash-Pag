@@ -41,6 +41,23 @@ security invoker
 set search_path = public
 as $$
 begin
+  -- Lock the session first. This both validates ownership and prevents a concurrent
+  -- revoke from invalidating the session after validation but before elevation.
+  perform 1
+    from public.app_sessions
+   where token_hash = p_session_token_hash
+     and user_id = p_user_id
+     and revoked_at is null
+     and expires_at > p_verified_at
+     and aal = 'aal1'
+   for update;
+
+  if not found then
+    raise exception using
+      errcode = 'P0001',
+      message = 'mfa_session_elevation_failed';
+  end if;
+
   update public.app_totp_factors
      set last_used_step = p_step,
          last_used_at = p_verified_at,
@@ -59,16 +76,7 @@ begin
          mfa_verified_at = p_verified_at,
          last_seen_at = p_verified_at
    where token_hash = p_session_token_hash
-     and user_id = p_user_id
-     and revoked_at is null
-     and expires_at > p_verified_at
-     and aal = 'aal1';
-
-  if not found then
-    raise exception using
-      errcode = 'P0001',
-      message = 'mfa_session_elevation_failed';
-  end if;
+     and user_id = p_user_id;
 
   return true;
 end;
