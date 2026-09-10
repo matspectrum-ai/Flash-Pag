@@ -211,25 +211,54 @@ func (c *Client) authRequest(ctx context.Context, accessToken, method, path stri
 }
 
 func (c *Client) ListMFAFactors(ctx context.Context, accessToken string) (MFAFactors, error) {
-	// Supabase's documented REST factor endpoint is not exposed by this project's
-	// PostgREST schema. A narrowly scoped SECURITY DEFINER RPC reads only the
-	// current user's verified TOTP factor ID via auth.uid().
-	var factorID string
-	if err := c.authRequest(ctx, accessToken, http.MethodPost, "/rest/v1/rpc/flashpag_verified_totp_factor", map[string]any{}, &factorID); err != nil {
+	// The Auth API exposes the current user, including MFA factor metadata.
+	// This avoids depending on PostgREST exposing the internal auth schema.
+	var out struct {
+		Factors []struct {
+			ID           string `json:"id"`
+			FactorType   string `json:"factor_type"`
+			Status       string `json:"status"`
+			FriendlyName string `json:"friendly_name"`
+		} `json:"factors"`
+	}
+	if err := c.authRequest(ctx, accessToken, http.MethodGet, "/auth/v1/user", nil, &out); err != nil {
 		return MFAFactors{}, err
 	}
-	if factorID == "" {
-		return MFAFactors{}, nil
+	factors := make([]MFAFactor, 0, len(out.Factors))
+	totp := make([]MFAFactor, 0, len(out.Factors))
+	for _, factor := range out.Factors {
+		f := MFAFactor{ID: factor.ID, Type: factor.FactorType, Status: factor.Status, FriendlyName: factor.FriendlyName}
+		factors = append(factors, f)
+		if factor.FactorType == "totp" && factor.Status == "verified" {
+			totp = append(totp, f)
+		}
 	}
-	factor := MFAFactor{ID: factorID, Type: "totp", Status: "verified"}
-	return MFAFactors{All: []MFAFactor{factor}, TOTP: []MFAFactor{factor}}, nil
+	return MFAFactors{All: factors, TOTP: totp}, nil
+}
+
+func (c *Client) UnenrollMFA(ctx context.Context, accessToken, factorID string) error {
+	return c.authRequest(ctx, accessToken, http.MethodDelete, "/auth/v1/factors/"+url.PathEscape(factorID), nil, nil)
 }
 
 func (c *Client) EnrollTOTP(ctx context.Context, accessToken, issuer string) (MFAEnrollment, error) {
+	// A failed enrollment leaves an unverified factor in Supabase. Remove only
+	// those inactive TOTP factors before starting a fresh enrollment; verified
+	// authenticators are never touched. This keeps retries idempotent and avoids
+	// friendly-name conflicts from abandoned setup attempts.
+	if factors, err := c.ListMFAFactors(ctx, accessToken); err == nil {
+		for _, factor := range factors.All {
+			if factor.Type == "totp" && factor.Status != "verified" {
+				if err := c.UnenrollMFA(ctx, accessToken, factor.ID); err != nil {
+					return MFAEnrollment{}, err
+				}
+			}
+		}
+	} else {
+		return MFAEnrollment{}, err
+	}
+
 	var out MFAEnrollment
 	body := map[string]string{"factor_type": "totp", "issuer": issuer}
-	// friendly_name is optional. Omitting it avoids duplicate-name conflicts when a
-	// previous enrollment attempt left an unverified factor behind.
 	err := c.authRequest(ctx, accessToken, http.MethodPost, "/auth/v1/factors", body, &out)
 	return out, err
 }
