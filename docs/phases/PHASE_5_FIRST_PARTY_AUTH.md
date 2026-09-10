@@ -33,18 +33,33 @@ No runtime authentication behavior is switched by Stage 1.
 
 ### Stage 2 — Go authentication
 
-Implement:
+Implemented foundation:
 - username normalization and uniqueness;
 - password hashing using Argon2id;
 - opaque server-side sessions with hashed bearer tokens;
 - session revocation and expiry;
-- login, registration and logout contracts in Go;
+- first-party HTTP login, session introspection and logout contracts;
 - uniform authentication failure responses to reduce account enumeration;
-- append-only security evidence.
+- PostgreSQL-backed username+IP login throttling;
+- explicit Secure cookie configuration for reverse-proxy deployments;
+- append-only security evidence schema.
+
+The first-party HTTP path remains opt-in and is not the production authentication path yet.
 
 ### Stage 3 — MFA and recovery migration
 
-Implement first-party TOTP enrollment/challenge/verification using encrypted secrets in `app_totp_factors`.
+Current implementation slice:
+- migration `0019_first_party_mfa_assurance.sql` adds explicit session assurance (`aal1`/`aal2`) and TOTP factor parameters/replay state;
+- Go TOTP primitives generate 160-bit secrets, build `otpauth://` provisioning URIs, and verify RFC 6238-compatible SHA-1 codes with a bounded ±1 timestep window;
+- verification returns the accepted timestep so the persistence layer can atomically reject code replay.
+
+Not yet complete:
+- encrypted TOTP factor persistence through the Go service;
+- enrollment/confirmation HTTP endpoints;
+- AAL1 -> AAL2 session elevation;
+- atomic replay protection in PostgreSQL;
+- recovery migration to first-party identity;
+- end-to-end MFA/recovery tests.
 
 Existing Supabase TOTP secrets must not be extracted. Existing users must enter an explicit re-enrollment path after the cutover. Recovery must be first-party and retain the existing Recovery Kit security model.
 
