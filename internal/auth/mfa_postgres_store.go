@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -70,6 +71,10 @@ func (s *PostgresMFAStore) ConsumeTOTPAndElevate(ctx context.Context, userID, to
 		select public.flashpag_consume_totp_and_elevate_session($1::uuid, $2, $3, $4)
 	`, userID, tokenHash, step, verifiedAt.UTC()).Scan(&elevated)
 	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "P0001" && pgErr.Message == "mfa_session_elevation_failed" {
+			return ErrMFAInvalidSession
+		}
 		return fmt.Errorf("consume totp and elevate session: %w", err)
 	}
 	if !elevated {
