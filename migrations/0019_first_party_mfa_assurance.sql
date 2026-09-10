@@ -26,4 +26,4 @@ ALTER TABLE app_totp_factors
   ADD CONSTRAINT app_totp_factors_algorithm_check CHECK (algorithm IN ('SHA1', 'SHA256', 'SHA512'));
 
 CREATE INDEX IF NOT EXISTS app_totp_factors_enabled_idx
-  ON app_totp_factors(user_id, enabled);
+  ON app_totp_factors(user_id, enabled_at);
