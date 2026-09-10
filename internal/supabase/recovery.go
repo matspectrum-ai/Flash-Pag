@@ -172,5 +172,19 @@ func (c *Client) RecoveryRateLimit(ctx context.Context, subjectHash, ipHash stri
 }
 
 func (c *Client) AdminResetMFAFactors(ctx context.Context, userID string) error {
-	return c.Do(ctx, http.MethodPost, "/rest/v1/rpc/flashpag_reset_user_mfa", nil, map[string]string{"p_user_id": userID}, "", nil)
+	var factors []struct {
+		ID string `json:"id"`
+	}
+	if err := c.adminAuthRequest(ctx, http.MethodGet, "/auth/v1/admin/users/"+url.PathEscape(userID)+"/factors", nil, &factors); err != nil {
+		return err
+	}
+	for _, factor := range factors {
+		if strings.TrimSpace(factor.ID) == "" {
+			return fmt.Errorf("auth factor has no id")
+		}
+		if err := c.adminAuthRequest(ctx, http.MethodDelete, "/auth/v1/admin/users/"+url.PathEscape(userID)+"/factors/"+url.PathEscape(factor.ID), nil, nil); err != nil {
+			return err
+		}
+	}
+	return nil
 }
