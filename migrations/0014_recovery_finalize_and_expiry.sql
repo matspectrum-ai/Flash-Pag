@@ -16,6 +16,7 @@ declare
   current_user_id uuid;
   current_key_id text;
   current_expires_at timestamptz;
+  kit_active boolean;
 begin
   select c.status, c.user_id, c.key_id, c.expires_at
     into current_status, current_user_id, current_key_id, current_expires_at
@@ -34,24 +35,30 @@ begin
     return;
   end if;
 
+  select exists (
+    select 1
+    from public.account_recovery_kits k
+    where k.user_id = current_user_id
+      and k.key_id = current_key_id
+      and k.status = 'active'
+  ) into kit_active;
+
   if current_status = 'verified' then
-    update public.account_recovery_challenges c
+    if not kit_active then
+      return;
+    end if;
+    update public.account_recovery_challenges
     set status = 'consuming'
-    where c.id = p_challenge_id
-      and c.status = 'verified'
-      and c.expires_at > now()
-      and exists (
-        select 1
-        from public.account_recovery_kits k
-        where k.user_id = c.user_id
-          and k.key_id = c.key_id
-          and k.status = 'active'
-      );
+    where id = p_challenge_id and status = 'verified' and expires_at > now();
     if not found then
       return;
     end if;
     current_status := 'consuming';
-  elsif current_status <> 'consuming' then
+  elsif current_status = 'consuming' then
+    if not kit_active then
+      return;
+    end if;
+  else
     return;
   end if;
 
@@ -69,26 +76,36 @@ language plpgsql
 security definer
 set search_path = ''
 as $$
+declare
+  kit_status text;
+  challenge_status text;
+  challenge_expires_at timestamptz;
 begin
-  update public.account_recovery_kits
-  set status = 'used', used_at = now(), revoked_at = now()
-  where user_id = p_user_id
-    and key_id = p_key_id
-    and status = 'active';
-  if not found then
+  select k.status
+    into kit_status
+  from public.account_recovery_kits k
+  where k.user_id = p_user_id and k.key_id = p_key_id
+  for update;
+
+  select c.status, c.expires_at
+    into challenge_status, challenge_expires_at
+  from public.account_recovery_challenges c
+  where c.id = p_challenge_id
+    and c.user_id = p_user_id
+    and c.key_id = p_key_id
+  for update;
+
+  if kit_status <> 'active' or challenge_status <> 'consuming' or challenge_expires_at <= now() then
     return false;
   end if;
 
+  update public.account_recovery_kits
+  set status = 'used', used_at = now(), revoked_at = now()
+  where user_id = p_user_id and key_id = p_key_id and status = 'active';
+
   update public.account_recovery_challenges
   set status = 'consumed', consumed_at = now()
-  where id = p_challenge_id
-    and user_id = p_user_id
-    and key_id = p_key_id
-    and status = 'consuming'
-    and expires_at > now();
-  if not found then
-    return false;
-  end if;
+  where id = p_challenge_id and status = 'consuming';
 
   return true;
 end;
