@@ -26,7 +26,11 @@ type Server struct {
 	mux       *http.ServeMux
 }
 
-func New(cfg config.Config, sb *supabase.Client, box *cryptobox.Box, providers *provider.Registry, log *slog.Logger, authService *auth.Service) *Server {
+func New(cfg config.Config, sb *supabase.Client, box *cryptobox.Box, providers *provider.Registry, log *slog.Logger, authServices ...*auth.Service) *Server {
+	var authService *auth.Service
+	if len(authServices) > 0 {
+		authService = authServices[0]
+	}
 	s := &Server{cfg: cfg, sb: sb, box: box, providers: providers, auth: authService, log: log, mux: http.NewServeMux()}
 	s.routes()
 	return s
