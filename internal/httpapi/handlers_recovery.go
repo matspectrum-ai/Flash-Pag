@@ -132,8 +132,12 @@ func (s *Server) consoleRecoveryChallenge(w http.ResponseWriter, r *http.Request
 		writeError(w, http.StatusUnauthorized, "recovery_failed", "recovery information is invalid")
 		return
 	}
+	if !strings.EqualFold(strings.TrimSpace(kit.AccountID), identifier) {
+		writeError(w, http.StatusUnauthorized, "recovery_failed", "recovery information is invalid")
+		return
+	}
 	user, err := s.sb.AdminGetUserByID(r.Context(), kit.AccountID)
-	if err != nil || strings.ToLower(strings.TrimSpace(user.Email)) != identifier {
+	if err != nil || user.ID == "" || !strings.EqualFold(strings.TrimSpace(user.ID), kit.AccountID) {
 		writeError(w, http.StatusUnauthorized, "recovery_failed", "recovery information is invalid")
 		return
 	}
@@ -154,12 +158,13 @@ func (s *Server) consoleRecoveryChallenge(w http.ResponseWriter, r *http.Request
 	}
 	challengeToken := hex.EncodeToString(challengeTokenBytes)
 	sum := sha256.Sum256([]byte(challengeToken))
-	challenge, err := s.sb.CreateRecoveryChallenge(r.Context(), kit.AccountID, kit.KeyID, hex.EncodeToString(sum[:]), time.Now().Add(recoveryTTL))
+	expiresAt := time.Now().Add(recoveryTTL)
+	challenge, err := s.sb.CreateRecoveryChallenge(r.Context(), kit.AccountID, kit.KeyID, hex.EncodeToString(sum[:]), expiresAt)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "recovery_failed", "recovery could not be started")
 		return
 	}
-	payload := recoveryCookiePayload{ChallengeID: challenge.ID, Token: challengeToken, UserID: kit.AccountID, KeyID: kit.KeyID, ExpiresAt: time.Now().Add(recoveryTTL).Unix()}
+	payload := recoveryCookiePayload{ChallengeID: challenge.ID, Token: challengeToken, UserID: kit.AccountID, KeyID: kit.KeyID, ExpiresAt: expiresAt.Unix()}
 	encoded, err := marshalJSON(payload)
 	if err != nil || s.setEncryptedCookie(w, recoveryCookie, string(encoded), int(recoveryTTL.Seconds())) != nil {
 		writeError(w, http.StatusInternalServerError, "recovery_failed", "recovery could not be started")
