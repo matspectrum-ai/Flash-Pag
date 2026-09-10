@@ -90,6 +90,11 @@ func (s *Server) withConsoleAuth(next http.HandlerFunc) http.HandlerFunc {
 			writeError(w, http.StatusUnauthorized, "invalid_session", "session expired or invalid")
 			return
 		}
+		active, err := s.sb.AuthSessionActive(r.Context(), c.Value)
+		if err != nil || !active {
+			writeError(w, http.StatusUnauthorized, "invalid_session", "session expired or invalid")
+			return
+		}
 		admin := false
 		var rows []struct {
 			UserID string `json:"user_id"`

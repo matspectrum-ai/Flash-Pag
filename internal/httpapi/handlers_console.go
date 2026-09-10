@@ -26,6 +26,7 @@ func (s *Server) login(w http.ResponseWriter, r *http.Request) {
 		writeError(w, 401, "login_failed", "invalid email/password")
 		return
 	}
+	clearCookie(w, recoveryCookie, s.cfg.CookieSecure)
 	factors, err := s.sb.ListMFAFactors(r.Context(), token)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "mfa_status_failed", "could not verify authenticator enrollment")
@@ -59,6 +60,7 @@ func (s *Server) logout(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{Name: "flashpag_session", Value: "", Path: "/", HttpOnly: true, Secure: s.cfg.CookieSecure, SameSite: http.SameSiteLaxMode, MaxAge: -1})
 	clearCookie(w, mfaPendingCookie, s.cfg.CookieSecure)
 	clearCookie(w, mfaStepUpCookie, s.cfg.CookieSecure)
+	clearCookie(w, recoveryCookie, s.cfg.CookieSecure)
 	w.WriteHeader(http.StatusNoContent)
 }
 

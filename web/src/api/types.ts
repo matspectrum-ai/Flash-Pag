@@ -204,6 +204,23 @@ export type MFAChallenge = {
   challenge_id: string
 }
 
+export type RecoverySetup = {
+  ok: boolean
+  filename: string
+  content_base64: string
+}
+
+export type RecoveryStatus = {
+  configured: boolean
+  created_at?: string | null
+  rotated_at?: string | null
+}
+
+export type RecoveryChallenge = {
+  ok: boolean
+  expires_in: number
+}
+
 export type Account = {
   id: string
   name: string

@@ -22,6 +22,9 @@ import type {
   MFAChallenge,
   MFAEnrollment,
   MFAStatus,
+  RecoveryChallenge,
+  RecoverySetup,
+  RecoveryStatus,
   MeResponse,
   MemberInput,
   MemberRole,
@@ -108,6 +111,10 @@ export const api = {
   mfaVerify: (input: { factor_id: string; challenge_id?: string; code: string }) => request<{ ok: boolean }>('/console/mfa/verify', { method: 'POST', body: JSON.stringify(input) }),
   mfaStepUpChallenge: () => request<MFAChallenge>('/console/mfa/step-up/challenge', { method: 'POST', body: '{}' }),
   mfaStepUpVerify: (input: MFAChallenge & { code: string }) => request<{ ok: boolean }>('/console/mfa/step-up/verify', { method: 'POST', body: JSON.stringify(input) }),
+  recoveryStatus: () => request<RecoveryStatus>('/console/recovery/status'),
+  recoverySetup: () => request<RecoverySetup>('/console/recovery/setup', { method: 'POST', body: '{}' }),
+  recoveryChallenge: (identifier: string, kitBase64: string) => request<RecoveryChallenge>('/console/recovery/challenge', { method: 'POST', body: JSON.stringify({ identifier, kit_base64: kitBase64 }) }),
+  recoveryResetPassword: (password: string, passwordConfirm: string) => request<{ ok: boolean; login_required: boolean; mfa_reenrollment_required: boolean }>('/console/recovery/reset-password', { method: 'POST', body: JSON.stringify({ password, password_confirm: passwordConfirm }) }),
   access: (organizationId: string) =>
     request<OrganizationAccess>(withOrganization('/console/api/access', organizationId)),
   summary: (organizationId: string) =>
