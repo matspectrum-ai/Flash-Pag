@@ -10,8 +10,8 @@ import (
 )
 
 type mfaMemoryStore struct {
-	factor    TOTPFactor
-	hasFactor bool
+	factor     TOTPFactor
+	hasFactor  bool
 	sessionAAL string
 }
 
@@ -21,6 +21,7 @@ func (m *mfaMemoryStore) GetTOTPFactor(context.Context, string) (TOTPFactor, err
 	}
 	return m.factor, nil
 }
+
 func (m *mfaMemoryStore) CreateTOTPFactor(_ context.Context, factor TOTPFactor) error {
 	if m.hasFactor {
 		return ErrMFAAlreadyEnrolled
@@ -29,7 +30,8 @@ func (m *mfaMemoryStore) CreateTOTPFactor(_ context.Context, factor TOTPFactor) 
 	m.hasFactor = true
 	return nil
 }
-func (m *mfaMemoryStore) EnableTOTPFactor(_ context.Context, userID string, verifiedAt time.Time, step int64) error {
+
+func (m *mfaMemoryStore) EnableTOTPFactor(_ context.Context, userID string, _ time.Time, step int64) error {
 	if !m.hasFactor || m.factor.UserID != userID {
 		return ErrMFANotEnrolled
 	}
@@ -40,6 +42,7 @@ func (m *mfaMemoryStore) EnableTOTPFactor(_ context.Context, userID string, veri
 	m.factor.LastUsedStep = &step
 	return nil
 }
+
 func (m *mfaMemoryStore) ConsumeTOTPCode(_ context.Context, userID string, step int64, _ time.Time) error {
 	if !m.hasFactor || !m.factor.Enabled || m.factor.UserID != userID {
 		return ErrMFANotEnrolled
@@ -50,6 +53,7 @@ func (m *mfaMemoryStore) ConsumeTOTPCode(_ context.Context, userID string, step 
 	m.factor.LastUsedStep = &step
 	return nil
 }
+
 func (m *mfaMemoryStore) ElevateSession(_ context.Context, tokenHash string, _ time.Time) error {
 	if tokenHash == "" {
 		return ErrMFAInvalidSession
@@ -108,7 +112,6 @@ func TestMFAVerifyAndElevateRejectsReplay(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Move time forward to make the same code's timestep accepted only once.
 	if err := s.VerifyAndElevate(context.Background(), "user-2", "session-1", firstCode); err == nil {
 		t.Fatal("expected replay rejection after enrollment consumed the timestep")
 	}
