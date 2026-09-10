@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/matspectrum-ai/Flash-Pag/internal/auth"
 	"github.com/matspectrum-ai/Flash-Pag/internal/config"
 	"github.com/matspectrum-ai/Flash-Pag/internal/cryptobox"
 	"github.com/matspectrum-ai/Flash-Pag/internal/provider"
@@ -20,12 +21,17 @@ type Server struct {
 	sb        *supabase.Client
 	box       *cryptobox.Box
 	providers *provider.Registry
+	auth      *auth.Service
 	log       *slog.Logger
 	mux       *http.ServeMux
 }
 
-func New(cfg config.Config, sb *supabase.Client, box *cryptobox.Box, providers *provider.Registry, log *slog.Logger) *Server {
-	s := &Server{cfg: cfg, sb: sb, box: box, providers: providers, log: log, mux: http.NewServeMux()}
+func New(cfg config.Config, sb *supabase.Client, box *cryptobox.Box, providers *provider.Registry, log *slog.Logger, authServices ...*auth.Service) *Server {
+	var authService *auth.Service
+	if len(authServices) > 0 {
+		authService = authServices[0]
+	}
+	s := &Server{cfg: cfg, sb: sb, box: box, providers: providers, auth: authService, log: log, mux: http.NewServeMux()}
 	s.routes()
 	return s
 }
@@ -39,6 +45,12 @@ func (s *Server) routes() {
 	})
 	s.mux.HandleFunc("GET /docs", s.docs)
 	s.mux.HandleFunc("GET /openapi.yaml", s.openapi)
+
+	// First-party authentication is opt-in and intentionally uses a separate cookie and route
+	// namespace during migration. The existing /console/session Supabase flow remains intact.
+	s.mux.HandleFunc("POST /auth/login", s.firstPartyLogin)
+	s.mux.HandleFunc("POST /auth/logout", s.firstPartyLogout)
+	s.mux.HandleFunc("GET /auth/me", s.firstPartyMe)
 
 	// Authentication and merchant onboarding.
 	s.mux.HandleFunc("POST /console/register", s.register)
@@ -179,36 +191,39 @@ func spaFileServer(root fs.FS) http.Handler {
 			fileServer.ServeHTTP(w, r)
 			return
 		}
-		clone := r.Clone(r.Context())
-		urlCopy := *r.URL
-		urlCopy.Path = "/"
-		clone.URL = &urlCopy
-		fileServer.ServeHTTP(w, clone)
+		index, err := fs.ReadFile(root, "index.html")
+		if err != nil {
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write(index)
 	})
-}
-
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
-}
-func writeError(w http.ResponseWriter, status int, code, msg string) {
-	writeJSON(w, status, map[string]any{"error": map[string]string{"code": code, "message": msg}})
-}
-func decodeJSON(r *http.Request, out any) error {
-	d := json.NewDecoder(io.LimitReader(r.Body, 1<<20))
-	d.DisallowUnknownFields()
-	return d.Decode(out)
 }
 
 func securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
+		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "no-referrer")
-		if strings.HasPrefix(r.URL.Path, "/console") || strings.HasPrefix(r.URL.Path, "/app") {
-			w.Header().Set("Content-Security-Policy", "default-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'")
-		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+func writeJSON(w http.ResponseWriter, status int, value any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(value)
+}
+
+func writeError(w http.ResponseWriter, status int, code, msg string) {
+	writeJSON(w, status, map[string]any{"error": map[string]string{"code": code, "message": msg}})
+}
+
+func decodeJSON(r *http.Request, out any) error {
+	d := json.NewDecoder(io.LimitReader(r.Body, 1<<20))
+	d.DisallowUnknownFields()
+	return d.Decode(out)
 }

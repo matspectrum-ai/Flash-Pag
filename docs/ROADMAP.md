@@ -111,12 +111,26 @@ Release gate:
 
 Detailed working plan: `docs/phases/PHASE_4_PLATFORM_ADMIN_ORGANIZATIONS.md`.
 
+## Phase 5 — First-party Identity and Authentication
+
+Status: IN PROGRESS.
+
+Objective:
+- Move runtime identity, sessions, MFA and recovery authority into Flash Pag Go.
+- Make `User + Password` the user-facing authentication model.
+- Keep PostgreSQL as persistence while removing Supabase Auth as the long-term runtime authority.
+- Preserve existing tenant, KYC/KYB, financial and UI invariants.
+
+Initial foundation is migration `0017_first_party_auth_foundation.sql` plus `docs/phases/PHASE_5_FIRST_PARTY_AUTH.md`.
+
+This phase is explicitly staged. Initial work must not change production authentication behavior. The eventual cutover requires separate validation of Go authentication, MFA/recovery, existing-user migration and removal of all runtime `auth.users`/`auth.sessions` dependencies.
+
 ## Later phases
 
-The exact order after Phase 3 must be explicitly agreed before implementation. Known backlog items include:
+Known backlog items include:
 - Dedicated withdrawal product/UI phase.
 - Refund/reversal compensating ledger journals and related hardening.
 - Broader provider-cost normalization if provider contracts expose trustworthy fee data.
 - Additional operational/admin controls as separately specified.
 
-No backlog item above may be promoted into the current phase implicitly.
+No backlog item above may be promoted into an active implementation scope implicitly.
