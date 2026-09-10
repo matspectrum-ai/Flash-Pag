@@ -128,10 +128,9 @@ The database/domain `Merchant` remains the durable commercial tenant boundary fo
 
 Platform operators manage Organizations/Commercial Accounts. The admin UI may resolve `organization.merchant_id` internally to call merchant-scoped contracts, but must not require an operator to create or understand a Merchant separately from the Organization being provisioned.
 
-The platform provisioning UX exposes one `New organization` action. Backend orchestration creates the internal Merchant boundary, optional owner membership, Organization and default BRL account; existing Merchant triggers initialize KYC and pricing.
+The platform provisioning UX exposes one `New organization` action. Backend orchestration creates the hidden Merchant boundary, optional owner membership, Organization and principal BRL account; existing Merchant triggers initialize KYC and pricing.
 
 This is an information-architecture/application-layer decision, not a schema rename. Existing tenant invariants and foreign keys remain intact.
-
 
 ## D-017 — Platform Organization provisioning is atomic in PostgreSQL
 
@@ -144,3 +143,21 @@ Migration `0010_platform_organization_provisioning.sql` provides service-role RP
 If any step fails, PostgreSQL rolls the whole operation back. Application-layer compensating deletion is not considered a sufficient invariant because pricing history uses restrictive/immutable relationships that may make best-effort deletion incomplete or impossible.
 
 The RPC is not applied directly to production during development. It must be applied and exercised first in the writable staging environment before the Phase 4 provisioning UI is enabled for real writes.
+
+## D-018 — First-party Flash Pag identity is the target authentication architecture
+
+Status: ACCEPTED.
+
+Flash Pag will own the application identity and authentication boundary in Go. The browser-facing login identifier is `User`, not email. The immutable internal identity is a UUID. PostgreSQL is the persistence layer; Supabase Auth is not the long-term runtime authority for application identity, sessions or MFA.
+
+The migration is staged rather than big-bang:
+1. establish first-party identity/session/MFA persistence and compatibility mappings;
+2. implement Go authentication and authorization against PostgreSQL;
+3. migrate existing memberships and recovery contracts from `auth.users` to first-party identities;
+4. migrate existing users through an explicit password/MFA re-enrollment path because third-party password and TOTP secrets are not application-readable;
+5. remove runtime dependencies on Supabase Auth;
+6. remove temporary compatibility fields and migration-only references.
+
+The Supabase PostgreSQL database may remain in use after the Auth cutover. This decision changes the runtime identity boundary, not the database vendor by itself.
+
+User-facing authentication UI must continue to follow `DESIGN.md`; the authentication architecture must not introduce a parallel visual system.
