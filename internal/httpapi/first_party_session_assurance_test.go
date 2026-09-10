@@ -25,12 +25,15 @@ func TestFirstPartySessionAssuranceLookup(t *testing.T) {
 	store := newFirstPartyMemoryStore()
 	user := auth.User{ID: "33333333-3333-4333-8333-333333333333", Username: "mateus", Status: "active"}
 	store.users[user.Username] = user
-	expiresAt := time.Now().UTC().Add(time.Hour)
-	store.sessions["token-hash"] = firstPartySessionRow{userID: user.ID, expiresAt: expiresAt}
+	rawToken := "raw-token"
+	store.sessions[auth.HashSessionToken(rawToken)] = firstPartySessionRow{userID: user.ID, expiresAt: time.Now().UTC().Add(time.Hour)}
 
 	service := auth.NewService(store)
-	session, err := service.AuthenticateSessionState(context.Background(), "raw-token")
-	if err == nil {
-		t.Fatalf("expected invalid token hash for raw token, got %+v", session)
+	session, err := service.AuthenticateSessionState(context.Background(), rawToken)
+	if err != nil {
+		t.Fatalf("AuthenticateSessionState() error = %v", err)
+	}
+	if session.User.ID != user.ID || session.AAL != "aal1" {
+		t.Fatalf("session = %+v, want user %s at aal1", session, user.ID)
 	}
 }
