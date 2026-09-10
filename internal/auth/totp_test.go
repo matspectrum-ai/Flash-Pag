@@ -1,24 +1,21 @@
 package auth
 
-import (
-	"strconv"
-	"testing"
-	"time"
-)
+import "testing"
+import "time"
 
 func TestGenerateTOTPSecretAndURI(t *testing.T) {
 	secret, err := GenerateTOTPSecret()
 	if err != nil {
 		t.Fatalf("GenerateTOTPSecret() error = %v", err)
 	}
-	if len(secret) < 32 {
-		t.Fatalf("secret length = %d, expected at least 32 Base32 characters", len(secret))
+	if len(secret) != 32 {
+		t.Fatalf("secret length = %d, want 32", len(secret))
 	}
 	uri, err := BuildTOTPURI(secret, "Flash Pag", "mateus")
 	if err != nil {
 		t.Fatalf("BuildTOTPURI() error = %v", err)
 	}
-	if uri == "" || uri[:14] != "otpauth://totp/" {
+	if uri == "" || len(uri) < len("otpauth://totp/") || uri[:14] != "otpauth://totp/" {
 		t.Fatalf("unexpected otpauth URI: %q", uri)
 	}
 }
@@ -31,7 +28,7 @@ func TestVerifyTOTPAllowsAdjacentStep(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decodeTOTPSecret() error = %v", err)
 	}
-	code := totpCode(decoded, step-1, func() hash.Hash { return sha1.New() })
+	code := totpCode(decoded, step-1)
 	gotStep, ok, err := VerifyTOTP(secret, code, now)
 	if err != nil {
 		t.Fatalf("VerifyTOTP() error = %v", err)
@@ -49,7 +46,7 @@ func TestVerifyTOTPCorrectCodeAndRejectsWrongCode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decodeTOTPSecret() error = %v", err)
 	}
-	code := totpCode(decoded, step, func() hash.Hash { return sha1.New() })
+	code := totpCode(decoded, step)
 	gotStep, ok, err := VerifyTOTP(secret, code, now)
 	if err != nil || !ok || gotStep != step {
 		t.Fatalf("valid VerifyTOTP() = (%d, %t, %v), want (%d, true, nil)", gotStep, ok, err, step)
@@ -60,8 +57,5 @@ func TestVerifyTOTPCorrectCodeAndRejectsWrongCode(t *testing.T) {
 	}
 	if _, ok, err := VerifyTOTP(secret, wrong, now); err != nil || ok {
 		t.Fatalf("wrong VerifyTOTP() = (%t, %v), want (false, nil)", ok, err)
-	}
-	if len(strconv.Itoa(step)) == 0 {
-		t.Fatal("unreachable")
 	}
 }
