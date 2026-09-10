@@ -31,7 +31,7 @@ func (m *mfaMemoryStore) CreateTOTPFactor(_ context.Context, factor TOTPFactor) 
 	return nil
 }
 
-func (m *mfaMemoryStore) EnableTOTPFactor(_ context.Context, userID string, _ time.Time, step int64) error {
+func (m *mfaMemoryStore) ConfirmTOTPEnrollment(_ context.Context, userID string, step int64, _ time.Time) error {
 	if !m.hasFactor || m.factor.UserID != userID {
 		return ErrMFANotEnrolled
 	}
@@ -43,21 +43,17 @@ func (m *mfaMemoryStore) EnableTOTPFactor(_ context.Context, userID string, _ ti
 	return nil
 }
 
-func (m *mfaMemoryStore) ConsumeTOTPCode(_ context.Context, userID string, step int64, _ time.Time) error {
+func (m *mfaMemoryStore) ConsumeTOTPAndElevate(_ context.Context, userID, tokenHash string, step int64, _ time.Time) error {
 	if !m.hasFactor || !m.factor.Enabled || m.factor.UserID != userID {
 		return ErrMFANotEnrolled
+	}
+	if tokenHash == "" {
+		return ErrMFAInvalidSession
 	}
 	if m.factor.LastUsedStep != nil && step <= *m.factor.LastUsedStep {
 		return ErrMFAReplay
 	}
 	m.factor.LastUsedStep = &step
-	return nil
-}
-
-func (m *mfaMemoryStore) ElevateSession(_ context.Context, tokenHash string, _ time.Time) error {
-	if tokenHash == "" {
-		return ErrMFAInvalidSession
-	}
 	m.sessionAAL = "aal2"
 	return nil
 }
@@ -122,6 +118,32 @@ func TestMFAVerifyAndElevateRejectsReplay(t *testing.T) {
 	}
 	if store.sessionAAL != "aal2" {
 		t.Fatalf("session assurance = %q, want aal2", store.sessionAAL)
+	}
+}
+
+func TestMFAVerifyAndElevateRejectsEmptySession(t *testing.T) {
+	box, err := cryptobox.New(make([]byte, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := &mfaMemoryStore{}
+	s := NewMFAService(store, box)
+	s.now = func() time.Time { return time.Unix(1700000000, 0).UTC() }
+
+	secret, _, err := s.BeginEnrollment(context.Background(), "user-4", "mateus")
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := decodeTOTPSecret(secret)
+	if err != nil {
+		t.Fatal(err)
+	}
+	step := s.now().Unix() / 30
+	if err := s.VerifyEnrollment(context.Background(), "user-4", totpCode(decoded, step)); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.VerifyAndElevate(context.Background(), "user-4", "", totpCode(decoded, step+1)); err != ErrMFAInvalidSession {
+		t.Fatalf("VerifyAndElevate() error = %v, want %v", err, ErrMFAInvalidSession)
 	}
 }
 
