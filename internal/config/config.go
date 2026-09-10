@@ -14,6 +14,8 @@ type Config struct {
 	SupabaseURL            string
 	SupabaseSecretKey      string
 	SupabasePublishableKey string
+	DatabaseURL            string
+	FirstPartyAuthEnabled  bool
 	CookieSecure           bool
 	PreviewReadOnly        bool
 	MasterKey              []byte
@@ -27,12 +29,17 @@ func Load() (Config, error) {
 		SupabaseURL:            strings.TrimRight(os.Getenv("SUPABASE_URL"), "/"),
 		SupabaseSecretKey:      os.Getenv("SUPABASE_SECRET_KEY"),
 		SupabasePublishableKey: os.Getenv("SUPABASE_PUBLISHABLE_KEY"),
+		DatabaseURL:            strings.TrimSpace(os.Getenv("DATABASE_URL")),
+		FirstPartyAuthEnabled:  strings.EqualFold(env("APP_FIRST_PARTY_AUTH_ENABLED", "false"), "true"),
 		CookieSecure:           strings.EqualFold(env("COOKIE_SECURE", "false"), "true"),
 		PreviewReadOnly:        strings.EqualFold(env("APP_PREVIEW_READ_ONLY", "false"), "true"),
 		WebhookPollInterval:    5 * time.Second,
 	}
 	if cfg.SupabaseURL == "" || cfg.SupabaseSecretKey == "" || cfg.SupabasePublishableKey == "" {
 		return Config{}, errors.New("SUPABASE_URL, SUPABASE_SECRET_KEY and SUPABASE_PUBLISHABLE_KEY are required")
+	}
+	if cfg.FirstPartyAuthEnabled && cfg.DatabaseURL == "" {
+		return Config{}, errors.New("DATABASE_URL is required when APP_FIRST_PARTY_AUTH_ENABLED is true")
 	}
 	if v := os.Getenv("APP_MASTER_KEY_B64"); v != "" {
 		raw, err := base64.StdEncoding.DecodeString(v)
