@@ -176,13 +176,13 @@ func (s *Server) consoleRecoveryResetPassword(w http.ResponseWriter, r *http.Req
 		return
 	}
 	var state recoveryCookiePayload
-	if !s.recoveryRateAllowed(r.Context(), state.UserID, r, 10, 30) {
-		writeError(w, http.StatusTooManyRequests, "recovery_rate_limited", "recovery is temporarily unavailable; try again later")
-		return
-	}
 	if unmarshalJSON([]byte(value), &state) != nil || state.ChallengeID == "" || state.Token == "" || state.UserID == "" || time.Now().Unix() >= state.ExpiresAt {
 		clearCookie(w, recoveryCookie, s.cfg.CookieSecure)
 		writeError(w, http.StatusUnauthorized, "recovery_required", "recovery verification expired")
+		return
+	}
+	if !s.recoveryRateAllowed(r.Context(), state.UserID, r, 10, 30) {
+		writeError(w, http.StatusTooManyRequests, "recovery_rate_limited", "recovery is temporarily unavailable; try again later")
 		return
 	}
 	var in struct {
@@ -207,6 +207,11 @@ func (s *Server) consoleRecoveryResetPassword(w http.ResponseWriter, r *http.Req
 	if claim.Status == "consumed" {
 		clearCookie(w, recoveryCookie, s.cfg.CookieSecure)
 		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "login_required": true, "mfa_reenrollment_required": true})
+		return
+	}
+	if claim.Status != "consuming" {
+		clearCookie(w, recoveryCookie, s.cfg.CookieSecure)
+		writeError(w, http.StatusUnauthorized, "recovery_required", "recovery verification is invalid or expired")
 		return
 	}
 	if err := s.sb.AdminUpdateUserPassword(r.Context(), claim.UserID, in.Password); err != nil {
