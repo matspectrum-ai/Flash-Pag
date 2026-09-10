@@ -56,14 +56,15 @@ Implemented MFA foundation:
 - first-party HTTP endpoints now expose MFA status, enrollment, enrollment verification and step-up;
 - step-up consumes the accepted timestep and elevates the same AAL1 session to AAL2 inside a PostgreSQL atomic operation;
 - session introspection carries MFA verification state and recent-MFA freshness is enforced by the first-party AAL2 middleware helper;
-- disposable PostgreSQL CI infrastructure is configured and a concurrency test executes the production migration functions against a real PostgreSQL instance.
+- disposable PostgreSQL CI infrastructure is configured and a concurrency test executes the production migration functions against a real PostgreSQL instance;
+- first-party authentication mutations enforce same-origin requests when browsers supply the `Origin` header, with `SameSite=Lax` retained on the session cookie.
 
 Not yet complete:
 - first-party recovery migration;
 - migration of memberships/platform-admin relationships from `auth.users` to `app_users`;
 - integration of first-party AAL2/recent-MFA authorization into the eventual financial/configuration cutover;
 - end-to-end account migration/re-enrollment flow for existing users;
-- final cookie mutation CSRF/Origin policy and production cutover validation.
+- final production cutover validation.
 
 Existing Supabase TOTP secrets must not be extracted. Existing users must enter an explicit re-enrollment path after the cutover. Recovery must be first-party and retain the existing Recovery Kit security model.
 
