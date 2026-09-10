@@ -29,7 +29,9 @@ type Server struct {
 
 func New(cfg config.Config, sb *supabase.Client, box *cryptobox.Box, providers *provider.Registry, log *slog.Logger, authServices ...*auth.Service) *Server {
 	var authService *auth.Service
-	if len(authServices) > 0 { authService = authServices[0] }
+	if len(authServices) > 0 {
+		authService = authServices[0]
+	}
 	s := &Server{cfg: cfg, sb: sb, box: box, providers: providers, auth: authService, log: log, mux: http.NewServeMux()}
 	s.routes()
 	return s
@@ -41,10 +43,14 @@ func NewWithMFA(cfg config.Config, sb *supabase.Client, box *cryptobox.Box, prov
 	return s
 }
 
-func (s *Server) Handler() http.Handler { return securityHeaders(previewReadOnly(s.cfg.PreviewReadOnly, s.mux)) }
+func (s *Server) Handler() http.Handler {
+	return securityHeaders(previewReadOnly(s.cfg.PreviewReadOnly, s.mux))
+}
 
 func (s *Server) routes() {
-	s.mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, http.StatusOK, map[string]any{"ok": true, "preview_read_only": s.cfg.PreviewReadOnly}) })
+	s.mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "preview_read_only": s.cfg.PreviewReadOnly})
+	})
 	s.mux.HandleFunc("GET /docs", s.docs)
 	s.mux.HandleFunc("GET /openapi.yaml", s.openapi)
 
@@ -133,18 +139,29 @@ func (s *Server) routes() {
 
 	legacy := http.FileServer(http.FS(ui.Files))
 	s.mux.Handle("/console/", http.StripPrefix("/console/", legacy))
-	s.mux.HandleFunc("GET /console", func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "/console/", http.StatusTemporaryRedirect) })
+	s.mux.HandleFunc("GET /console", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/console/", http.StatusTemporaryRedirect)
+	})
 	if appRoot, err := fs.Sub(ui.AppFiles, "dist"); err == nil {
 		s.mux.Handle("/app/", http.StripPrefix("/app", spaFileServer(appRoot)))
-		s.mux.HandleFunc("GET /app", func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "/app/", http.StatusTemporaryRedirect) })
+		s.mux.HandleFunc("GET /app", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/app/", http.StatusTemporaryRedirect)
+		})
 	}
-	s.mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) { http.Redirect(w, r, "/app/", http.StatusTemporaryRedirect) })
+	s.mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/app/", http.StatusTemporaryRedirect)
+	})
 }
 
 func previewReadOnly(enabled bool, next http.Handler) http.Handler {
-	if !enabled { return next }
+	if !enabled {
+		return next
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/console/session" && (r.Method == http.MethodPost || r.Method == http.MethodDelete) { next.ServeHTTP(w, r); return }
+		if r.URL.Path == "/console/session" && (r.Method == http.MethodPost || r.Method == http.MethodDelete) {
+			next.ServeHTTP(w, r)
+			return
+		}
 		switch r.Method {
 		case http.MethodGet, http.MethodHead, http.MethodOptions:
 			next.ServeHTTP(w, r)
@@ -159,10 +176,19 @@ func spaFileServer(root fs.FS) http.Handler {
 	fileServer := http.FileServer(http.FS(root))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := strings.TrimPrefix(r.URL.Path, "/")
-		if path == "" { fileServer.ServeHTTP(w, r); return }
-		if _, err := fs.Stat(root, path); err == nil { fileServer.ServeHTTP(w, r); return }
+		if path == "" {
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+		if _, err := fs.Stat(root, path); err == nil {
+			fileServer.ServeHTTP(w, r)
+			return
+		}
 		index, err := fs.ReadFile(root, "index.html")
-		if err != nil { fileServer.ServeHTTP(w, r); return }
+		if err != nil {
+			fileServer.ServeHTTP(w, r)
+			return
+		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		_, _ = w.Write(index)
 	})
