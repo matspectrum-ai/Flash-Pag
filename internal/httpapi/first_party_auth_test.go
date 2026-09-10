@@ -18,6 +18,7 @@ type firstPartyMemoryStore struct {
 	users       map[string]auth.User
 	credentials map[string]auth.Credential
 	sessions    map[string]firstPartySessionRow
+	rates       map[string]firstPartyRateRow
 }
 
 type firstPartySessionRow struct {
@@ -26,11 +27,18 @@ type firstPartySessionRow struct {
 	revokedAt *time.Time
 }
 
+type firstPartyRateRow struct {
+	failures     int
+	windowStart  time.Time
+	blockedUntil *time.Time
+}
+
 func newFirstPartyMemoryStore() *firstPartyMemoryStore {
 	return &firstPartyMemoryStore{
 		users:       map[string]auth.User{},
 		credentials: map[string]auth.Credential{},
 		sessions:    map[string]firstPartySessionRow{},
+		rates:       map[string]firstPartyRateRow{},
 	}
 }
 
@@ -85,6 +93,33 @@ func (m *firstPartyMemoryStore) FindSessionUser(_ context.Context, tokenHash str
 		}
 	}
 	return auth.User{}, errors.New("user not found")
+}
+
+func (m *firstPartyMemoryStore) AllowLogin(_ context.Context, keyHash, _, _ string, now time.Time) (bool, error) {
+	row, ok := m.rates[keyHash]
+	if !ok || !now.Before(row.windowStart.Add(15*time.Minute)) {
+		return true, nil
+	}
+	return row.blockedUntil == nil || !now.Before(*row.blockedUntil), nil
+}
+
+func (m *firstPartyMemoryStore) RecordLoginFailure(_ context.Context, keyHash, _, _ string, now time.Time) error {
+	row, ok := m.rates[keyHash]
+	if !ok || !now.Before(row.windowStart.Add(15*time.Minute)) {
+		row = firstPartyRateRow{windowStart: now}
+	}
+	row.failures++
+	if row.failures >= 5 {
+		blocked := now.Add(15 * time.Minute)
+		row.blockedUntil = &blocked
+	}
+	m.rates[keyHash] = row
+	return nil
+}
+
+func (m *firstPartyMemoryStore) ResetLoginFailures(_ context.Context, keyHash string) error {
+	delete(m.rates, keyHash)
+	return nil
 }
 
 func newFirstPartyTestServer(store *firstPartyMemoryStore) *Server {
