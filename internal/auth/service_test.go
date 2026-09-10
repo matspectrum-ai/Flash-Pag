@@ -116,10 +116,10 @@ func TestServiceRegisterAndAuthenticate(t *testing.T) {
 	if authenticated.ID != user.ID || token == "" || !expiresAt.Equal(fixedNow.Add(sessionTTL)) {
 		t.Fatalf("Authenticate() returned invalid result: user=%+v token-empty=%t expires=%v", authenticated, token == "", expiresAt)
 	}
-	if _, err := service.Authenticate(context.Background(), "mateus", "wrong password", "ip", "ua"); !errors.Is(err, ErrInvalidCredentials) {
+	if _, _, _, err := service.Authenticate(context.Background(), "mateus", "wrong password", "ip", "ua"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("invalid password error = %v", err)
 	}
-	if _, err := service.Authenticate(context.Background(), "unknown", "wrong password", "ip", "ua"); !errors.Is(err, ErrInvalidCredentials) {
+	if _, _, _, err := service.Authenticate(context.Background(), "unknown", "wrong password", "ip", "ua"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("unknown username error = %v", err)
 	}
 
