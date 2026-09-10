@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	argon2MemoryKiB = 64 * 1024
+	argon2MemoryKiB  = 64 * 1024
 	argon2Iterations = 3
 	argon2Threads    = 4
 	argon2KeyLength  = 32
