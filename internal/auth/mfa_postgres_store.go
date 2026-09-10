@@ -50,55 +50,30 @@ func (s *PostgresMFAStore) CreateTOTPFactor(ctx context.Context, factor TOTPFact
 	return nil
 }
 
-func (s *PostgresMFAStore) EnableTOTPFactor(ctx context.Context, userID string, verifiedAt time.Time, step int64) error {
-	var consumed bool
+func (s *PostgresMFAStore) ConfirmTOTPEnrollment(ctx context.Context, userID string, step int64, verifiedAt time.Time) error {
+	var confirmed bool
 	err := s.pool.QueryRow(ctx, `
-		select public.flashpag_consume_totp_code($1::uuid, $2, $3)
-	`, userID, step, verifiedAt.UTC()).Scan(&consumed)
+		select public.flashpag_confirm_totp_enrollment($1::uuid, $2, $3)
+	`, userID, step, verifiedAt.UTC()).Scan(&confirmed)
 	if err != nil {
-		return fmt.Errorf("enable totp factor: %w", err)
+		return fmt.Errorf("confirm totp enrollment: %w", err)
 	}
-	if !consumed {
-		return ErrMFAReplay
-	}
-	_, err = s.pool.Exec(ctx, `
-		update public.app_totp_factors
-		   set enabled_at = $2,
-		       disabled_at = null,
-		       updated_at = $2
-		 where user_id = $1::uuid
-		   and disabled_at is null
-	`, userID, verifiedAt.UTC())
-	if err != nil {
-		return fmt.Errorf("activate totp factor: %w", err)
-	}
-	return nil
-}
-
-func (s *PostgresMFAStore) ConsumeTOTPCode(ctx context.Context, userID string, step int64, usedAt time.Time) error {
-	var consumed bool
-	err := s.pool.QueryRow(ctx, `
-		select public.flashpag_consume_totp_code($1::uuid, $2, $3)
-	`, userID, step, usedAt.UTC()).Scan(&consumed)
-	if err != nil {
-		return fmt.Errorf("consume totp code: %w", err)
-	}
-	if !consumed {
+	if !confirmed {
 		return ErrMFAReplay
 	}
 	return nil
 }
 
-func (s *PostgresMFAStore) ElevateSession(ctx context.Context, tokenHash string, verifiedAt time.Time) error {
+func (s *PostgresMFAStore) ConsumeTOTPAndElevate(ctx context.Context, userID, tokenHash string, step int64, verifiedAt time.Time) error {
 	var elevated bool
 	err := s.pool.QueryRow(ctx, `
-		select public.flashpag_elevate_auth_session($1, $2)
-	`, tokenHash, verifiedAt.UTC()).Scan(&elevated)
+		select public.flashpag_consume_totp_and_elevate_session($1::uuid, $2, $3, $4)
+	`, userID, tokenHash, step, verifiedAt.UTC()).Scan(&elevated)
 	if err != nil {
-		return fmt.Errorf("elevate auth session: %w", err)
+		return fmt.Errorf("consume totp and elevate session: %w", err)
 	}
 	if !elevated {
-		return ErrMFAInvalidSession
+		return ErrMFAReplay
 	}
 	return nil
 }
