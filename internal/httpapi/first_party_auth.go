@@ -15,6 +15,7 @@ import (
 
 const firstPartySessionCookie = "flashpag_first_party_session"
 const firstPartyPrincipalKey ctxKey = "first-party-principal"
+const firstPartySessionKey ctxKey = "first-party-session"
 
 func (s *Server) firstPartyAuthEnabled() bool {
 	return s.cfg.FirstPartyAuthEnabled && s.auth != nil
@@ -44,6 +45,11 @@ func (s *Server) firstPartyLogin(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusUnauthorized, "invalid_credentials", "username or password is invalid")
 			return
 		}
+		if errors.Is(err, auth.ErrTooManyAttempts) {
+			w.Header().Set("Retry-After", "900")
+			writeError(w, http.StatusTooManyRequests, "too_many_attempts", "too many authentication attempts")
+			return
+		}
 		writeError(w, http.StatusInternalServerError, "authentication_failed", "authentication service is unavailable")
 		return
 	}
@@ -64,6 +70,7 @@ func (s *Server) firstPartyLogin(w http.ResponseWriter, r *http.Request) {
 			"id":       user.ID,
 			"username": user.Username,
 		},
+		"aal":        "aal1",
 		"expires_at": expiresAt,
 	})
 }
@@ -93,7 +100,7 @@ func (s *Server) firstPartyMe(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "not_authenticated", "login required")
 		return
 	}
-	user, err := s.auth.AuthenticateSession(r.Context(), c.Value)
+	session, err := s.auth.AuthenticateSessionState(r.Context(), c.Value)
 	if err != nil {
 		clearCookie(w, firstPartySessionCookie, s.cfg.CookieSecure)
 		writeError(w, http.StatusUnauthorized, "invalid_session", "session expired or invalid")
@@ -101,13 +108,22 @@ func (s *Server) firstPartyMe(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"user": map[string]any{
-			"id":       user.ID,
-			"username": user.Username,
+			"id":       session.User.ID,
+			"username": session.User.Username,
 		},
+		"aal": session.AAL,
 	})
 }
 
 func (s *Server) withFirstPartyAuth(next http.HandlerFunc) http.HandlerFunc {
+	return s.withFirstPartySession("", next)
+}
+
+func (s *Server) withFirstPartyAAL2(next http.HandlerFunc) http.HandlerFunc {
+	return s.withFirstPartySession("aal2", next)
+}
+
+func (s *Server) withFirstPartySession(requiredAAL string, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !s.firstPartyAuthEnabled() {
 			writeError(w, http.StatusNotFound, "not_found", "endpoint not available")
@@ -118,19 +134,30 @@ func (s *Server) withFirstPartyAuth(next http.HandlerFunc) http.HandlerFunc {
 			writeError(w, http.StatusUnauthorized, "not_authenticated", "login required")
 			return
 		}
-		user, err := s.auth.AuthenticateSession(r.Context(), c.Value)
+		session, err := s.auth.AuthenticateSessionState(r.Context(), c.Value)
 		if err != nil {
 			clearCookie(w, firstPartySessionCookie, s.cfg.CookieSecure)
 			writeError(w, http.StatusUnauthorized, "invalid_session", "session expired or invalid")
 			return
 		}
-		next(w, r.WithContext(context.WithValue(r.Context(), firstPartyPrincipalKey, user)))
+		if requiredAAL != "" && session.AAL != requiredAAL {
+			writeError(w, http.StatusForbidden, "mfa_required", "recent multi-factor authentication is required")
+			return
+		}
+		ctx := context.WithValue(r.Context(), firstPartyPrincipalKey, session.User)
+		ctx = context.WithValue(ctx, firstPartySessionKey, session)
+		next(w, r.WithContext(ctx))
 	}
 }
 
 func firstPartyP(ctx context.Context) auth.User {
 	user, _ := ctx.Value(firstPartyPrincipalKey).(auth.User)
 	return user
+}
+
+func firstPartySession(ctx context.Context) auth.Session {
+	session, _ := ctx.Value(firstPartySessionKey).(auth.Session)
+	return session
 }
 
 func hashHeader(value string) string {
