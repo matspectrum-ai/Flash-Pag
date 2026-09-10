@@ -46,6 +46,12 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /docs", s.docs)
 	s.mux.HandleFunc("GET /openapi.yaml", s.openapi)
 
+	// First-party authentication is opt-in and intentionally uses a separate cookie and route
+	// namespace during migration. The existing /console/session Supabase flow remains intact.
+	s.mux.HandleFunc("POST /auth/login", s.firstPartyLogin)
+	s.mux.HandleFunc("POST /auth/logout", s.firstPartyLogout)
+	s.mux.HandleFunc("GET /auth/me", s.firstPartyMe)
+
 	// Authentication and merchant onboarding.
 	s.mux.HandleFunc("POST /console/register", s.register)
 	s.mux.HandleFunc("POST /console/session", s.login)
@@ -185,13 +191,13 @@ func spaFileServer(root fs.FS) http.Handler {
 			fileServer.ServeHTTP(w, r)
 			return
 		}
-		data, err := fs.ReadFile(root, "index.html")
+		index, err := fs.ReadFile(root, "index.html")
 		if err != nil {
 			fileServer.ServeHTTP(w, r)
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = w.Write(data)
+		_, _ = w.Write(index)
 	})
 }
 
