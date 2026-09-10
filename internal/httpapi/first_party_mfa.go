@@ -43,10 +43,10 @@ func (s *Server) firstPartyMFAEnroll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
-		"issuer":       "Flash Pag",
+		"issuer":        "Flash Pag",
 		"account_label": user.Username,
-		"secret":       secret,
-		"uri":          uri,
+		"secret":        secret,
+		"uri":           uri,
 	})
 }
 
@@ -55,7 +55,9 @@ func (s *Server) firstPartyMFAEnrollVerify(w http.ResponseWriter, r *http.Reques
 		writeError(w, http.StatusNotFound, "not_found", "endpoint not available")
 		return
 	}
-	var in struct { Code string `json:"code"` }
+	var in struct {
+		Code string `json:"code"`
+	}
 	if err := decodeJSON(r, &in); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
 		return
@@ -90,7 +92,9 @@ func (s *Server) firstPartyMFAStepUp(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "not_authenticated", "login required")
 		return
 	}
-	var in struct { Code string `json:"code"` }
+	var in struct {
+		Code string `json:"code"`
+	}
 	if err := decodeJSON(r, &in); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_json", "invalid request body")
 		return
