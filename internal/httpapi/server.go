@@ -35,27 +35,19 @@ func New(cfg config.Config, sb *supabase.Client, box *cryptobox.Box, providers *
 	return s
 }
 
-// NewWithMFA is the first-party authentication constructor used during the staged
-// migration. The legacy constructor remains source-compatible for existing callers.
 func NewWithMFA(cfg config.Config, sb *supabase.Client, box *cryptobox.Box, providers *provider.Registry, log *slog.Logger, authService *auth.Service, mfaService *auth.MFAService) *Server {
 	s := &Server{cfg: cfg, sb: sb, box: box, providers: providers, auth: authService, mfa: mfaService, log: log, mux: http.NewServeMux()}
 	s.routes()
 	return s
 }
 
-func (s *Server) Handler() http.Handler {
-	return securityHeaders(previewReadOnly(s.cfg.PreviewReadOnly, s.mux))
-}
+func (s *Server) Handler() http.Handler { return securityHeaders(previewReadOnly(s.cfg.PreviewReadOnly, s.mux)) }
 
 func (s *Server) routes() {
-	s.mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "preview_read_only": s.cfg.PreviewReadOnly})
-	})
+	s.mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, http.StatusOK, map[string]any{"ok": true, "preview_read_only": s.cfg.PreviewReadOnly}) })
 	s.mux.HandleFunc("GET /docs", s.docs)
 	s.mux.HandleFunc("GET /openapi.yaml", s.openapi)
 
-	// First-party authentication is opt-in and intentionally uses a separate cookie and route
-	// namespace during migration. The existing /console/session Supabase flow remains intact.
 	s.mux.HandleFunc("POST /auth/login", s.firstPartyLogin)
 	s.mux.HandleFunc("POST /auth/logout", s.firstPartyLogout)
 	s.mux.HandleFunc("GET /auth/me", s.firstPartyMe)
@@ -64,7 +56,6 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /auth/mfa/enroll/verify", s.withFirstPartyAuth(s.firstPartyMFAEnrollVerify))
 	s.mux.HandleFunc("POST /auth/mfa/step-up", s.withFirstPartyAuth(s.firstPartyMFAStepUp))
 
-	// Authentication and merchant onboarding.
 	s.mux.HandleFunc("POST /console/register", s.register)
 	s.mux.HandleFunc("POST /console/session", s.login)
 	s.mux.HandleFunc("DELETE /console/session", s.logout)
@@ -79,8 +70,6 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /console/recovery/challenge", s.consoleRecoveryChallenge)
 	s.mux.HandleFunc("POST /console/recovery/reset-password", s.consoleRecoveryResetPassword)
 
-	// Private application API. The /console prefix is retained during the React migration
-	// as an implementation detail and is not exposed as product terminology in the UI.
 	s.mux.HandleFunc("GET /console/api/me", s.withConsoleAuth(s.consoleMe))
 	s.mux.HandleFunc("GET /console/api/access", s.withConsoleAuth(s.consoleAccess))
 	s.mux.HandleFunc("GET /console/api/summary", s.withConsoleAuth(s.consoleSummary))
@@ -96,7 +85,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /console/api/members", s.withConsoleAuth(s.consoleMembers))
 	s.mux.HandleFunc("POST /console/api/members", s.withConsoleAuth(s.consoleCreateMember))
 	s.mux.HandleFunc("PATCH /console/api/members/{userID}", s.withConsoleAuth(s.consoleUpdateMember))
-	s.mux.HandleFunc("DELETE /console/api/members/{userID}", s.consoleWithAuthDeleteMember())
+	s.mux.HandleFunc("DELETE /console/api/members/{userID}", s.withConsoleAuth(s.consoleDeleteMember))
 	s.mux.HandleFunc("GET /console/api/{resource}", s.withConsoleAuth(s.consoleList))
 	s.mux.HandleFunc("POST /console/api/customers", s.withConsoleAuth(s.consoleCreateCustomer))
 	s.mux.HandleFunc("POST /console/api/api-keys", s.withRecentMFA(s.consoleCreateAPIKey))
@@ -111,6 +100,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /console/api/withdrawal-destinations", s.withRecentMFA(s.withKYCApprovedConsole(s.consoleCreateWithdrawalDestination)))
 	s.mux.HandleFunc("DELETE /console/api/withdrawal-destinations/{id}", s.withRecentMFA(s.withKYCApprovedConsole(s.consoleDeleteWithdrawalDestination)))
 	s.mux.HandleFunc("POST /console/api/withdrawals", s.withRecentMFA(s.withKYCApprovedConsole(s.consoleCreateWithdrawal)))
+
 	s.mux.HandleFunc("GET /console/api/admin/tenants", s.withAdmin(s.adminTenantInventory))
 	s.mux.HandleFunc("GET /console/api/admin/merchants/{merchantID}/members", s.withAdmin(s.adminMerchantMembers))
 	s.mux.HandleFunc("GET /console/api/admin/organizations/{organizationID}/stats", s.withAdmin(s.adminOrganizationStats))
@@ -125,6 +115,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /console/api/admin/organizations", s.withAdmin(s.adminCreateOrganization))
 	s.mux.HandleFunc("POST /console/api/admin/organizations/provision", s.withAdmin(s.adminProvisionOrganization))
 	s.mux.HandleFunc("POST /console/api/admin/members", s.withAdmin(s.adminAddMember))
+
 	s.mux.HandleFunc("GET /v1/balance", s.withAPIScope("balance:read", s.getBalance))
 	s.mux.HandleFunc("POST /v1/pix/charges", s.withAPIScope("pix:write", s.withKYCApprovedAPI(s.createCharge)))
 	s.mux.HandleFunc("GET /v1/pix/charges/{id}", s.withAPIScope("pix:read", s.getTransaction))
