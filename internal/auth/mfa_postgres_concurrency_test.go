@@ -29,7 +29,10 @@ func TestPostgresMFAStoreConcurrentReplay(t *testing.T) {
 		t.Fatalf("ping postgres: %v", err)
 	}
 
+	resetMFATestSchema(t, ctx, pool)
 	applyMFATestSchema(t, ctx, pool)
+	defer resetMFATestSchema(t, ctx, pool)
+
 	const userID = "11111111-1111-4111-8111-111111111111"
 	const sessionHash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	if _, err := pool.Exec(ctx, `
@@ -117,6 +120,21 @@ func applyMFATestSchema(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
 		}
 		if _, err := pool.Exec(ctx, string(data)); err != nil {
 			t.Fatalf("apply %s: %v", migration, err)
+		}
+	}
+}
+
+func resetMFATestSchema(t *testing.T, ctx context.Context, pool *pgxpool.Pool) {
+	t.Helper()
+	for _, stmt := range []string{
+		`drop function if exists public.flashpag_consume_totp_and_elevate_session(uuid, text, bigint, timestamptz);`,
+		`drop function if exists public.flashpag_confirm_totp_enrollment(uuid, bigint, timestamptz);`,
+		`drop table if exists public.app_totp_factors cascade;`,
+		`drop table if exists public.app_sessions cascade;`,
+		`drop table if exists public.app_users cascade;`,
+	} {
+		if _, err := pool.Exec(ctx, stmt); err != nil {
+			t.Fatalf("reset MFA fixture: %v", err)
 		}
 	}
 }
