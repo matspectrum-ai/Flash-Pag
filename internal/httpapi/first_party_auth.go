@@ -1,15 +1,20 @@
 package httpapi
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/matspectrum-ai/Flash-Pag/internal/auth"
 )
 
 const firstPartySessionCookie = "flashpag_first_party_session"
+const firstPartyPrincipalKey ctxKey = "first-party-principal"
 
 func (s *Server) firstPartyAuthEnabled() bool {
 	return s.cfg.FirstPartyAuthEnabled && s.auth != nil
@@ -33,9 +38,7 @@ func (s *Server) firstPartyLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ipHash := requestIPHash(r)
-	uaHash := hashHeader(r.UserAgent())
-	user, token, expiresAt, err := s.auth.Authenticate(r.Context(), in.Username, in.Password, ipHash, uaHash)
+	user, token, expiresAt, err := s.auth.Authenticate(r.Context(), in.Username, in.Password, requestIPHash(r), hashHeader(r.UserAgent()))
 	if err != nil {
 		if errors.Is(err, auth.ErrInvalidCredentials) {
 			writeError(w, http.StatusUnauthorized, "invalid_credentials", "username or password is invalid")
@@ -53,7 +56,7 @@ func (s *Server) firstPartyLogin(w http.ResponseWriter, r *http.Request) {
 		Secure:   s.cfg.CookieSecure,
 		SameSite: http.SameSiteLaxMode,
 		Expires:  expiresAt,
-		MaxAge:   int(expiresAt.Sub(timeNow()).Seconds()),
+		MaxAge:   int(time.Until(expiresAt).Seconds()),
 	})
 	writeJSON(w, http.StatusOK, map[string]any{
 		"authenticated": true,
@@ -142,5 +145,3 @@ func requestIPHash(r *http.Request) string {
 	}
 	return hashHeader(host)
 }
-
-func timeNow() time.Time { return time.Now().UTC() }
