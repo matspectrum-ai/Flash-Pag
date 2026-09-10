@@ -9,9 +9,9 @@ import (
 )
 
 const (
-	loginRateWindow   = 15 * time.Minute
-	loginRateLimit    = 5
-	loginBlockPeriod  = 15 * time.Minute
+	loginRateWindow  = 15 * time.Minute
+	loginRateLimit   = 5
+	loginBlockPeriod = 15 * time.Minute
 )
 
 type LoginRateLimiter interface {
