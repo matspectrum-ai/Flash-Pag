@@ -48,18 +48,22 @@ The first-party HTTP path remains opt-in and is not the production authenticatio
 
 ### Stage 3 — MFA and recovery migration
 
-Current implementation slice:
+Implemented MFA foundation:
 - migration `0019_first_party_mfa_assurance.sql` adds explicit session assurance (`aal1`/`aal2`) and TOTP factor parameters/replay state;
+- migration `0020_first_party_mfa_atomicity.sql` and `0021_first_party_mfa_atomic_step.sql` establish PostgreSQL state-transition functions;
 - Go TOTP primitives generate 160-bit secrets, build `otpauth://` provisioning URIs, and verify RFC 6238-compatible SHA-1 codes with a bounded ±1 timestep window;
-- verification returns the accepted timestep so the persistence layer can atomically reject code replay.
+- TOTP secrets are encrypted at rest through the existing AES-GCM cryptobox and are never returned from persistence APIs;
+- first-party HTTP endpoints now expose MFA status, enrollment, enrollment verification and step-up;
+- step-up consumes the accepted timestep and elevates the same AAL1 session to AAL2 inside a PostgreSQL atomic operation;
+- session introspection carries MFA verification state and recent-MFA freshness is enforced by the first-party AAL2 middleware helper;
+- disposable PostgreSQL CI infrastructure is configured and a concurrency test executes the production migration functions against a real PostgreSQL instance.
 
 Not yet complete:
-- encrypted TOTP factor persistence through the Go service;
-- enrollment/confirmation HTTP endpoints;
-- AAL1 -> AAL2 session elevation;
-- atomic replay protection in PostgreSQL;
-- recovery migration to first-party identity;
-- end-to-end MFA/recovery tests.
+- first-party recovery migration;
+- migration of memberships/platform-admin relationships from `auth.users` to `app_users`;
+- integration of first-party AAL2/recent-MFA authorization into the eventual financial/configuration cutover;
+- end-to-end account migration/re-enrollment flow for existing users;
+- final cookie mutation CSRF/Origin policy and production cutover validation.
 
 Existing Supabase TOTP secrets must not be extracted. Existing users must enter an explicit re-enrollment path after the cutover. Recovery must be first-party and retain the existing Recovery Kit security model.
 
