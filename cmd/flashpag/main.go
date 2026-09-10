@@ -10,8 +10,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/matspectrum-ai/Flash-Pag/internal/auth"
 	"github.com/matspectrum-ai/Flash-Pag/internal/config"
 	"github.com/matspectrum-ai/Flash-Pag/internal/cryptobox"
+	"github.com/matspectrum-ai/Flash-Pag/internal/db"
 	"github.com/matspectrum-ai/Flash-Pag/internal/httpapi"
 	"github.com/matspectrum-ai/Flash-Pag/internal/provider"
 	providermock "github.com/matspectrum-ai/Flash-Pag/internal/provider/mock"
@@ -36,8 +38,29 @@ func main() {
 			os.Exit(1)
 		}
 	}
+
+	var authService *auth.Service
+	var authStore *auth.PostgresStore
+	if cfg.FirstPartyAuthEnabled {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		pool, openErr := db.Open(ctx, cfg.DatabaseURL)
+		cancel()
+		if openErr != nil {
+			log.Error("first-party auth database error", "err", openErr)
+			os.Exit(1)
+		}
+		authStore = auth.NewPostgresStore(pool)
+		if err := pool.Ping(context.Background()); err != nil {
+			authStore.Close()
+			log.Error("first-party auth database ping failed", "err", err)
+			os.Exit(1)
+		}
+		authService = auth.NewService(authStore)
+		log.Info("first-party auth storage enabled")
+	}
+
 	providers := provider.NewRegistry(providermock.New(), providerpixhub.New())
-	app := httpapi.New(cfg, sb, box, providers, log)
+	app := httpapi.New(cfg, sb, box, providers, log, authService)
 	srv := &http.Server{Addr: cfg.Addr, Handler: app.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 20 * time.Second, IdleTimeout: 60 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -53,4 +76,7 @@ func main() {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_ = srv.Shutdown(shutdownCtx)
+	if authStore != nil {
+		authStore.Close()
+	}
 }
