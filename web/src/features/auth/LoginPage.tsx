@@ -3,6 +3,7 @@ import { ArrowRight, Building2, CircleCheck, KeyRound, LockKeyhole, Mail, Shield
 import { api, ApiError } from '../../api/client'
 import { useSession } from '../../app/session'
 import { BrandMark } from '../../components/brand/BrandMark'
+import { MFAQRCode } from '../../components/security/MFAQRCode'
 import type { MFAEnrollment } from '../../api/types'
 import './auth-onboarding.css'
 
@@ -109,7 +110,7 @@ export function LoginPage() {
   const security = securityMode === 'setup' ? (
     <div className="mfa-auth-flow">
       <div className="auth-card-header"><span className="eyebrow">Proteção obrigatória</span><h2>Ative o Google Authenticator</h2><p>Escaneie o QR Code no aplicativo autenticador e confirme com o código de 6 dígitos.</p></div>
-      {enrollment ? <><div className="mfa-qr"><img src={enrollment.qr_code} alt="QR Code para configurar o Google Authenticator" /></div><div className="mfa-secret"><span>Se não conseguir escanear</span><code>{enrollment.secret}</code></div></> : <div className="skeleton skeleton-panel" />}
+      {enrollment ? <><MFAQRCode uri={enrollment.uri} alt="QR Code para configurar o Google Authenticator" /><div className="mfa-secret"><span>Se não conseguir escanear</span><code>{enrollment.secret}</code></div></> : <div className="skeleton skeleton-panel" />}
       <form className="auth-form" onSubmit={verifyMFA}><label className="field"><span>Código do autenticador</span><div className="input-with-icon"><KeyRound size={16} /><input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={code} onChange={(event) => setCode(event.target.value.replace(/\D/g, ''))} placeholder="000000" autoFocus required /></div></label>{error ? <div className="auth-error">{error}</div> : null}<button className="button button-primary button-full" type="submit" disabled={loading || code.length !== 6}>{loading ? 'Confirmando…' : 'Ativar proteção'}</button></form>
     </div>
   ) : (
