@@ -11,8 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// PostgresStore persists first-party authentication state in PostgreSQL.
-// It deliberately knows nothing about Supabase Auth; PostgreSQL is only a persistence layer.
 type PostgresStore struct {
 	pool *pgxpool.Pool
 }
@@ -134,6 +132,63 @@ func (s *PostgresStore) FindSessionUser(ctx context.Context, tokenHash string, n
 	}
 	user.ID = userID
 	return user, nil
+}
+
+func (s *PostgresStore) AllowLogin(ctx context.Context, keyHash, usernameHash, ipHash string, now time.Time) (bool, error) {
+	var blockedUntil *time.Time
+	var failures int
+	err := s.pool.QueryRow(ctx, `
+		select blocked_until, failures
+		from public.app_auth_rate_limits
+		where key_hash = $1
+	`, keyHash).Scan(&blockedUntil, &failures)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return true, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("check auth rate limit: %w", err)
+	}
+	if blockedUntil != nil && now.Before(blockedUntil.UTC()) {
+		return false, nil
+	}
+	return true, nil
+}
+
+func (s *PostgresStore) RecordLoginFailure(ctx context.Context, keyHash, usernameHash, ipHash string, now time.Time) error {
+	_, err := s.pool.Exec(ctx, `
+		insert into public.app_auth_rate_limits
+			(key_hash, username_hash, ip_hash, window_started_at, failures, updated_at)
+		values ($1, $2, $3, $4, 1, $4)
+		on conflict (key_hash) do update set
+			username_hash = excluded.username_hash,
+			ip_hash = excluded.ip_hash,
+			window_started_at = case
+				when public.app_auth_rate_limits.window_started_at <= $4 - interval '15 minutes'
+				then $4 else public.app_auth_rate_limits.window_started_at end,
+			failures = case
+				when public.app_auth_rate_limits.window_started_at <= $4 - interval '15 minutes'
+				then 1
+				else public.app_auth_rate_limits.failures + 1 end,
+			blocked_until = case
+				when public.app_auth_rate_limits.window_started_at <= $4 - interval '15 minutes'
+				then null
+				when public.app_auth_rate_limits.failures + 1 >= 5
+				then $4 + interval '15 minutes'
+				else public.app_auth_rate_limits.blocked_until end,
+			updated_at = $4
+	`, keyHash, usernameHash, ipHash, now.UTC())
+	if err != nil {
+		return fmt.Errorf("record auth failure: %w", err)
+	}
+	return nil
+}
+
+func (s *PostgresStore) ResetLoginFailures(ctx context.Context, keyHash string) error {
+	_, err := s.pool.Exec(ctx, `delete from public.app_auth_rate_limits where key_hash = $1`, keyHash)
+	if err != nil {
+		return fmt.Errorf("reset auth rate limit: %w", err)
+	}
+	return nil
 }
 
 func mapCreateUserError(err error) error {
