@@ -68,3 +68,8 @@
 .mfa-secret span { color: var(--muted, #8d8d98); font-size: 12px; }
 .mfa-secret code { overflow-wrap: anywhere; font-size: 12px; letter-spacing: .08em; }
 .mfa-step-icon { width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; background: rgba(116, 92, 255, .12); color: #a99cff; }
+.auth-link-button { margin: 13px auto 0; border: 0; background: transparent; color: var(--fp-text-tertiary); font: inherit; font-size: 11px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.auth-link-button:hover { color: var(--fp-text); }
+.auth-form input[type="file"] { width: 100%; padding: 10px; border: 1px dashed var(--fp-border); border-radius: 9px; background: var(--fp-surface-subtle); color: var(--fp-text-secondary); font: inherit; font-size: 11px; }
+.auth-form input[type="file"]::file-selector-button { margin-right: 9px; border: 1px solid var(--fp-border); border-radius: 7px; background: var(--fp-surface-raised); color: var(--fp-text); padding: 6px 9px; cursor: pointer; }
+.form-hint { display: block; margin-top: 8px; color: var(--fp-text-tertiary); font-size: 10px; line-height: 1.45; }

@@ -63,20 +63,39 @@ create or replace function public.flashpag_begin_recovery_reset(
   p_challenge_id uuid,
   p_token_hash text
 )
-returns table(user_id uuid, key_id text)
+returns table(user_id uuid, key_id text, status text)
 language plpgsql
 security definer
 set search_path = ''
 as $$
+declare
+  current_status text;
+  current_user_id uuid;
+  current_key_id text;
 begin
-  return query
-  update public.account_recovery_challenges c
-  set status = 'consuming'
-  where c.id = p_challenge_id
-    and c.token_hash = p_token_hash
-    and c.status = 'verified'
-    and c.expires_at > now()
-  returning c.user_id, c.key_id;
+  select c.status, c.user_id, c.key_id
+    into current_status, current_user_id, current_key_id
+  from public.account_recovery_challenges c
+  where c.id = p_challenge_id and c.token_hash = p_token_hash
+  for update;
+
+  if current_status is null then
+    return;
+  end if;
+
+  if current_status = 'verified' then
+    update public.account_recovery_challenges
+    set status = 'consuming'
+    where id = p_challenge_id and expires_at > now();
+    if not found then
+      return;
+    end if;
+    current_status := 'consuming';
+  elsif current_status not in ('consuming','consumed') then
+    return;
+  end if;
+
+  return query select current_user_id, current_key_id, current_status;
 end;
 $$;
 
@@ -141,3 +160,62 @@ grant execute on function public.flashpag_begin_recovery_reset(uuid,text) to ser
 grant execute on function public.flashpag_finalize_recovery_reset(uuid,uuid,text) to service_role;
 grant execute on function public.flashpag_abort_recovery_reset(uuid,uuid,text) to service_role;
 grant execute on function public.flashpag_auth_session_active(uuid) to service_role;
+
+create table if not exists public.account_recovery_rate_limits (
+  bucket_key text primary key,
+  window_started_at timestamptz not null default now(),
+  attempt_count integer not null default 0 check (attempt_count >= 0)
+);
+
+alter table public.account_recovery_rate_limits enable row level security;
+revoke all on public.account_recovery_rate_limits from public, anon, authenticated;
+grant all on public.account_recovery_rate_limits to service_role;
+
+create or replace function public.flashpag_recovery_rate_limit(
+  p_subject_hash text,
+  p_ip_hash text,
+  p_subject_limit integer default 5,
+  p_ip_limit integer default 20
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  subject_count integer;
+  ip_count integer;
+  now_value timestamptz := now();
+begin
+  insert into public.account_recovery_rate_limits(bucket_key, window_started_at, attempt_count)
+  values (p_subject_hash, now_value, 1)
+  on conflict (bucket_key) do update
+    set attempt_count = case
+      when public.account_recovery_rate_limits.window_started_at <= now_value - interval '10 minutes' then 1
+      else public.account_recovery_rate_limits.attempt_count + 1
+    end,
+    window_started_at = case
+      when public.account_recovery_rate_limits.window_started_at <= now_value - interval '10 minutes' then now_value
+      else public.account_recovery_rate_limits.window_started_at
+    end
+  returning attempt_count into subject_count;
+
+  insert into public.account_recovery_rate_limits(bucket_key, window_started_at, attempt_count)
+  values (p_ip_hash, now_value, 1)
+  on conflict (bucket_key) do update
+    set attempt_count = case
+      when public.account_recovery_rate_limits.window_started_at <= now_value - interval '10 minutes' then 1
+      else public.account_recovery_rate_limits.attempt_count + 1
+    end,
+    window_started_at = case
+      when public.account_recovery_rate_limits.window_started_at <= now_value - interval '10 minutes' then now_value
+      else public.account_recovery_rate_limits.window_started_at
+    end
+  returning attempt_count into ip_count;
+
+  return subject_count <= greatest(1, p_subject_limit) and ip_count <= greatest(1, p_ip_limit);
+end;
+$$;
+
+revoke all on function public.flashpag_recovery_rate_limit(text,text,integer,integer) from public, anon, authenticated;
+grant execute on function public.flashpag_recovery_rate_limit(text,text,integer,integer) to service_role;

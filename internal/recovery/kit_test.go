@@ -62,3 +62,18 @@ func TestVerifierChangesWithSecret(t *testing.T) {
 		t.Fatal("verifier did not change")
 	}
 }
+
+func TestRateHashIsDomainSeparated(t *testing.T) {
+	serverKey := bytes.Repeat([]byte{5}, 32)
+	a, err := RateHash(serverKey, "subject", "same")
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := RateHash(serverKey, "ip", "same")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a == b {
+		t.Fatal("rate hashes are not domain separated")
+	}
+}

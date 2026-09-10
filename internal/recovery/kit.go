@@ -103,6 +103,18 @@ func Parse(data, serverKey []byte) (Kit, error) {
 	return Kit{AccountID: accountID, KeyID: keyID, Secret: secret}, nil
 }
 
+func RateHash(serverKey []byte, purpose, value string) (string, error) {
+	if len(serverKey) < 32 {
+		return "", ErrInvalidKey
+	}
+	h := hmac.New(sha256.New, serverKey)
+	h.Write([]byte("flashpag-recovery-rate-v1:"))
+	h.Write([]byte(purpose))
+	h.Write([]byte{0})
+	h.Write([]byte(value))
+	return hex.EncodeToString(h.Sum(nil)), nil
+}
+
 func Verifier(serverKey []byte, secret []byte) (string, error) {
 	if len(serverKey) < 32 || len(secret) != secretSize {
 		return "", ErrInvalidKey
