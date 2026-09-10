@@ -1,0 +1,1 @@
+First-party MFA currently has service/storage primitives only. HTTP exposure remains gated on transactional code-consumption/session-elevation semantics and concurrent PostgreSQL integration tests.
