@@ -181,15 +181,13 @@ func spaFileServer(root fs.FS) http.Handler {
 			fileServer.ServeHTTP(w, r)
 			return
 		}
-		// Let the SPA router handle unknown app paths.
-		index, err := fs.Open(root, "index.html")
+		data, err := fs.ReadFile(root, "index.html")
 		if err != nil {
 			fileServer.ServeHTTP(w, r)
 			return
 		}
-		defer index.Close()
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		_, _ = io.Copy(w, index)
+		_, _ = w.Write(data)
 	})
 }
 
