@@ -2,6 +2,8 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"strings"
 	"time"
@@ -11,7 +13,6 @@ var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrInvalidUsername    = errors.New("invalid username")
 	ErrUserExists         = errors.New("username already exists")
-	ErrUserBlocked        = errors.New("user is not active")
 )
 
 const (
@@ -33,7 +34,7 @@ type Credential struct {
 }
 
 // Store is the persistence boundary for first-party authentication.
-// Implementations must make RegisterUser atomic across the identity and credential rows.
+// Implementations must make CreateUser atomic across the identity and credential rows.
 type Store interface {
 	FindUserByUsername(ctx context.Context, usernameNormalized string) (User, error)
 	CreateUser(ctx context.Context, user User, credential Credential) error
@@ -65,9 +66,8 @@ func (s *Service) Register(ctx context.Context, username, password string) (User
 	if err != nil {
 		return User{}, err
 	}
-	user := User{ID: userID, Username: username, Status: "active"}
-	err = s.store.CreateUser(ctx, user, Credential{UserID: userID, PasswordHash: hash})
-	if err != nil {
+	user := User{ID: userID, Username: normalized, Status: "active"}
+	if err := s.store.CreateUser(ctx, user, Credential{UserID: userID, PasswordHash: hash}); err != nil {
 		if errors.Is(err, ErrUserExists) {
 			return User{}, ErrUserExists
 		}
@@ -83,8 +83,8 @@ func (s *Service) Authenticate(ctx context.Context, username, password, ipHash, 
 	}
 	user, err := s.store.FindUserByUsername(ctx, normalized)
 	if err != nil {
-		// Run the same Argon2id verifier for unknown usernames so the cheap lookup
-		// path does not expose an obvious timing distinction from a known user.
+		// Verify against a fixed-cost hash so an unknown username does not take a
+		// materially cheaper path than a known username.
 		_, _ = VerifyPassword(password, dummyPasswordHash)
 		return User{}, "", time.Time{}, ErrInvalidCredentials
 	}
@@ -136,27 +136,27 @@ func NormalizeUsername(raw string) (string, error) {
 	if len(value) < minUsernameLen || len(value) > maxUsernameLen {
 		return "", ErrInvalidUsername
 	}
-	for i, r := range value {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '.' || r == '_' || r == '-' {
-			if i == 0 || i == len(value)-1 {
-				continue
-			}
-			continue
-		}
+	if value[0] == '.' || value[0] == '_' || value[0] == '-' || value[len(value)-1] == '.' || value[len(value)-1] == '_' || value[len(value)-1] == '-' {
 		return "", ErrInvalidUsername
 	}
-	if value[0] == '.' || value[0] == '_' || value[0] == '-' || value[len(value)-1] == '.' || value[len(value)-1] == '_' || value[len(value)-1] == '-' {
+	for _, r := range value {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '.' || r == '_' || r == '-' {
+			continue
+		}
 		return "", ErrInvalidUsername
 	}
 	return value, nil
 }
 
 func NewIdentityID() (string, error) {
-	token, err := NewSessionToken()
-	if err != nil {
-		return "", err
+	var raw [16]byte
+	if _, err := rand.Read(raw[:]); err != nil {
+		return "", errors.New("generate identity id")
 	}
-	return HashSessionToken(token)[:32], nil
+	raw[6] = (raw[6] & 0x0f) | 0x40
+	raw[8] = (raw[8] & 0x3f) | 0x80
+	encoded := hex.EncodeToString(raw[:])
+	return encoded[:8] + "-" + encoded[8:12] + "-" + encoded[12:16] + "-" + encoded[16:20] + "-" + encoded[20:], nil
 }
 
 const dummyPasswordHash = "$argon2id$v=19$m=65536,t=3,p=4$0n3az3UG+4fpTxsOhSj2iw$2mUDZHb9EsbznMPlIgvft/f7v05+ntX+Qtm8UpWZFBk"
