@@ -225,9 +225,11 @@ func (c *Client) ListMFAFactors(ctx context.Context, accessToken string) (MFAFac
 	return MFAFactors{All: []MFAFactor{factor}, TOTP: []MFAFactor{factor}}, nil
 }
 
-func (c *Client) EnrollTOTP(ctx context.Context, accessToken, friendlyName, issuer string) (MFAEnrollment, error) {
+func (c *Client) EnrollTOTP(ctx context.Context, accessToken, issuer string) (MFAEnrollment, error) {
 	var out MFAEnrollment
-	body := map[string]string{"factor_type": "totp", "friendly_name": friendlyName, "issuer": issuer}
+	body := map[string]string{"factor_type": "totp", "issuer": issuer}
+	// friendly_name is optional. Omitting it avoids duplicate-name conflicts when a
+	// previous enrollment attempt left an unverified factor behind.
 	err := c.authRequest(ctx, accessToken, http.MethodPost, "/auth/v1/factors", body, &out)
 	return out, err
 }
