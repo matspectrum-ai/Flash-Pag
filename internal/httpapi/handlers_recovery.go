@@ -204,11 +204,6 @@ func (s *Server) consoleRecoveryResetPassword(w http.ResponseWriter, r *http.Req
 		writeError(w, http.StatusUnauthorized, "recovery_required", "recovery verification is invalid or expired")
 		return
 	}
-	if claim.Status == "consumed" {
-		clearCookie(w, recoveryCookie, s.cfg.CookieSecure)
-		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "login_required": true, "mfa_reenrollment_required": true})
-		return
-	}
 	if claim.Status != "consuming" {
 		clearCookie(w, recoveryCookie, s.cfg.CookieSecure)
 		writeError(w, http.StatusUnauthorized, "recovery_required", "recovery verification is invalid or expired")
@@ -219,18 +214,10 @@ func (s *Server) consoleRecoveryResetPassword(w http.ResponseWriter, r *http.Req
 		writeError(w, http.StatusBadGateway, "password_reset_failed", "password could not be changed")
 		return
 	}
-	factors, err := s.sb.AdminListMFAFactors(r.Context(), claim.UserID)
-	if err != nil {
+	if err := s.sb.AdminResetMFAFactors(r.Context(), claim.UserID); err != nil {
 		_, _ = s.sb.AbortRecoveryReset(r.Context(), state.ChallengeID, claim.UserID, claim.KeyID)
 		writeError(w, http.StatusBadGateway, "mfa_reset_failed", "authenticator reset could not be completed")
 		return
-	}
-	for _, factor := range factors {
-		if err := s.sb.AdminDeleteMFAFactor(r.Context(), claim.UserID, factor.ID); err != nil {
-			_, _ = s.sb.AbortRecoveryReset(r.Context(), state.ChallengeID, claim.UserID, claim.KeyID)
-			writeError(w, http.StatusBadGateway, "mfa_reset_failed", "authenticator reset could not be completed")
-			return
-		}
 	}
 	if ok, err := s.sb.FinalizeRecoveryReset(r.Context(), state.ChallengeID, claim.UserID, claim.KeyID); err != nil || !ok {
 		writeError(w, http.StatusBadGateway, "recovery_finalize_failed", "recovery could not be finalized")

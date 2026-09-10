@@ -31,12 +31,6 @@ type RecoveryResetClaim struct {
 	Status string `json:"status"`
 }
 
-type AdminMFAFactor struct {
-	ID     string `json:"id"`
-	Type   string `json:"factor_type"`
-	Status string `json:"status"`
-}
-
 func (c *Client) adminAuthRequest(ctx context.Context, method, path string, body any, out any) error {
 	var r io.Reader
 	if body != nil {
@@ -80,16 +74,6 @@ func (c *Client) AdminGetUserByID(ctx context.Context, userID string) (AuthUser,
 
 func (c *Client) AdminUpdateUserPassword(ctx context.Context, userID, password string) error {
 	return c.adminAuthRequest(ctx, http.MethodPut, "/auth/v1/admin/users/"+url.PathEscape(userID), map[string]string{"password": password}, nil)
-}
-
-func (c *Client) AdminListMFAFactors(ctx context.Context, userID string) ([]AdminMFAFactor, error) {
-	var out []AdminMFAFactor
-	err := c.adminAuthRequest(ctx, http.MethodGet, "/auth/v1/admin/users/"+url.PathEscape(userID)+"/factors", nil, &out)
-	return out, err
-}
-
-func (c *Client) AdminDeleteMFAFactor(ctx context.Context, userID, factorID string) error {
-	return c.adminAuthRequest(ctx, http.MethodDelete, "/auth/v1/admin/users/"+url.PathEscape(userID)+"/factors/"+url.PathEscape(factorID), nil, nil)
 }
 
 func (c *Client) AuthSessionActive(ctx context.Context, accessToken string) (bool, error) {
@@ -185,4 +169,8 @@ func (c *Client) RecoveryRateLimit(ctx context.Context, subjectHash, ipHash stri
 		"p_subject_hash": subjectHash, "p_ip_hash": ipHash, "p_subject_limit": subjectLimit, "p_ip_limit": ipLimit,
 	}, "", &out)
 	return out, err
+}
+
+func (c *Client) AdminResetMFAFactors(ctx context.Context, userID string) error {
+	return c.Do(ctx, http.MethodPost, "/rest/v1/rpc/flashpag_reset_user_mfa", nil, map[string]string{"p_user_id": userID}, "", nil)
 }
