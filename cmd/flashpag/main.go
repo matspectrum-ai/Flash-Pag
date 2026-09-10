@@ -41,6 +41,7 @@ func main() {
 
 	var authService *auth.Service
 	var authStore *auth.PostgresStore
+	var mfaStore *auth.PostgresMFAStore
 	var mfaService *auth.MFAService
 	if cfg.FirstPartyAuthEnabled {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -51,13 +52,14 @@ func main() {
 			os.Exit(1)
 		}
 		authStore = auth.NewPostgresStore(pool)
+		mfaStore = auth.NewPostgresMFAStore(pool)
 		if err := pool.Ping(context.Background()); err != nil {
 			authStore.Close()
 			log.Error("first-party auth database ping failed", "err", err)
 			os.Exit(1)
 		}
 		authService = auth.NewService(authStore)
-		mfaService = auth.NewMFAService(authStore, box)
+		mfaService = auth.NewMFAService(mfaStore, box)
 		log.Info("first-party auth storage enabled")
 	}
 
