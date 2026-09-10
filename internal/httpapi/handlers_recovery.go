@@ -215,17 +215,15 @@ func (s *Server) consoleRecoveryResetPassword(w http.ResponseWriter, r *http.Req
 		return
 	}
 	if err := s.sb.AdminUpdateUserPassword(r.Context(), claim.UserID, in.Password); err != nil {
-		_, _ = s.sb.AbortRecoveryReset(r.Context(), state.ChallengeID, claim.UserID, claim.KeyID)
-		writeError(w, http.StatusBadGateway, "password_reset_failed", "password could not be changed")
+		writeError(w, http.StatusBadGateway, "password_reset_failed", "password could not be changed; recovery can be retried")
 		return
 	}
 	if err := s.sb.AdminResetMFAFactors(r.Context(), claim.UserID); err != nil {
-		_, _ = s.sb.AbortRecoveryReset(r.Context(), state.ChallengeID, claim.UserID, claim.KeyID)
-		writeError(w, http.StatusBadGateway, "mfa_reset_failed", "authenticator reset could not be completed")
+		writeError(w, http.StatusBadGateway, "mfa_reset_failed", "authenticator reset could not be completed; recovery can be retried")
 		return
 	}
 	if ok, err := s.sb.FinalizeRecoveryReset(r.Context(), state.ChallengeID, claim.UserID, claim.KeyID); err != nil || !ok {
-		writeError(w, http.StatusBadGateway, "recovery_finalize_failed", "recovery could not be finalized")
+		writeError(w, http.StatusBadGateway, "recovery_finalize_failed", "recovery could not be finalized; recovery can be retried")
 		return
 	}
 	clearCookie(w, recoveryCookie, s.cfg.CookieSecure)
