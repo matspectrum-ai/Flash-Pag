@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/matspectrum-ai/Flash-Pag/internal/supabase"
 )
 
 func (s *Server) pendingOrSessionToken(r *http.Request) (string, error) {
@@ -42,6 +44,11 @@ func (s *Server) consoleMFAEnroll(w http.ResponseWriter, r *http.Request) {
 	}
 	enrollment, err := s.sb.EnrollTOTP(r.Context(), token, "Flash Pag")
 	if err != nil {
+		if supabaseErr, ok := err.(*supabase.Error); ok {
+			s.log.Warn("supabase mfa enrollment failed", "status", supabaseErr.Status, "body", supabaseErr.Body)
+		} else {
+			s.log.Warn("mfa enrollment failed", "error", err)
+		}
 		writeError(w, http.StatusBadGateway, "mfa_enroll_failed", "could not start authenticator enrollment")
 		return
 	}
