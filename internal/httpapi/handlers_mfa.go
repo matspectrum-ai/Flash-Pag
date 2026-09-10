@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/matspectrum-ai/Flash-Pag/internal/supabase"
 )
 
 func (s *Server) pendingOrSessionToken(r *http.Request) (string, error) {
@@ -118,6 +120,11 @@ func (s *Server) consoleMFAVerify(w http.ResponseWriter, r *http.Request) {
 	}
 	session, err := s.sb.VerifyMFA(r.Context(), token, in.FactorID, in.ChallengeID, in.Code)
 	if err != nil || session.AccessToken == "" {
+		if supabaseErr, ok := err.(*supabase.Error); ok {
+			s.log.Warn("supabase mfa verification failed", "status", supabaseErr.Status, "body", supabaseErr.Body)
+		} else if err != nil {
+			s.log.Warn("mfa verification failed", "error", err)
+		}
 		writeError(w, http.StatusUnauthorized, "mfa_verification_failed", "invalid or expired authenticator code")
 		return
 	}
