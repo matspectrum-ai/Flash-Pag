@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"strings"
@@ -8,8 +9,8 @@ import (
 )
 
 const (
-	loginRateWindow  = 15 * time.Minute
-	loginRateLimit   = 5
+	loginRateWindow   = 15 * time.Minute
+	loginRateLimit    = 5
 	loginBlockPeriod  = 15 * time.Minute
 )
 
