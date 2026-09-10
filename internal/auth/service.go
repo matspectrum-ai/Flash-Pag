@@ -13,6 +13,7 @@ var (
 	ErrInvalidCredentials = errors.New("invalid credentials")
 	ErrInvalidUsername    = errors.New("invalid username")
 	ErrUserExists         = errors.New("username already exists")
+	ErrTooManyAttempts    = errors.New("too many login attempts")
 )
 
 const (
@@ -33,8 +34,6 @@ type Credential struct {
 	MustChange   bool
 }
 
-// Store is the persistence boundary for first-party authentication.
-// Implementations must make CreateUser atomic across the identity and credential rows.
 type Store interface {
 	FindUserByUsername(ctx context.Context, usernameNormalized string) (User, error)
 	CreateUser(ctx context.Context, user User, credential Credential) error
@@ -42,6 +41,9 @@ type Store interface {
 	CreateSession(ctx context.Context, userID, tokenHash, ipHash, userAgentHash string, expiresAt time.Time) error
 	RevokeSession(ctx context.Context, tokenHash string, revokedAt time.Time) error
 	FindSessionUser(ctx context.Context, tokenHash string, now time.Time) (User, error)
+	AllowLogin(ctx context.Context, keyHash, usernameHash, ipHash string, now time.Time) (bool, error)
+	RecordLoginFailure(ctx context.Context, keyHash, usernameHash, ipHash string, now time.Time) error
+	ResetLoginFailures(ctx context.Context, keyHash string) error
 }
 
 type Service struct {
@@ -81,31 +83,44 @@ func (s *Service) Authenticate(ctx context.Context, username, password, ipHash, 
 	if err != nil {
 		return User{}, "", time.Time{}, ErrInvalidCredentials
 	}
+	now := s.now()
+	keyHash := RateLimitKey(normalized, ipHash)
+	if allowed, err := s.store.AllowLogin(ctx, keyHash, UsernameHash(normalized), ipHash, now); err != nil {
+		return User{}, "", time.Time{}, err
+	} else if !allowed {
+		_, _ = VerifyPassword(password, dummyPasswordHash)
+		return User{}, "", time.Time{}, ErrTooManyAttempts
+	}
+
 	user, err := s.store.FindUserByUsername(ctx, normalized)
 	if err != nil {
-		// Verify against a fixed-cost hash so an unknown username does not take a
-		// materially cheaper path than a known username.
 		_, _ = VerifyPassword(password, dummyPasswordHash)
+		_ = s.store.RecordLoginFailure(ctx, keyHash, UsernameHash(normalized), ipHash, now)
 		return User{}, "", time.Time{}, ErrInvalidCredentials
 	}
 	if user.Status != "active" {
 		_, _ = VerifyPassword(password, dummyPasswordHash)
+		_ = s.store.RecordLoginFailure(ctx, keyHash, UsernameHash(normalized), ipHash, now)
 		return User{}, "", time.Time{}, ErrInvalidCredentials
 	}
 	credential, err := s.store.GetCredential(ctx, user.ID)
 	if err != nil || credential.PasswordHash == "" {
 		_, _ = VerifyPassword(password, dummyPasswordHash)
+		_ = s.store.RecordLoginFailure(ctx, keyHash, UsernameHash(normalized), ipHash, now)
 		return User{}, "", time.Time{}, ErrInvalidCredentials
 	}
 	valid, err := VerifyPassword(password, credential.PasswordHash)
 	if err != nil || !valid {
+		_ = s.store.RecordLoginFailure(ctx, keyHash, UsernameHash(normalized), ipHash, now)
 		return User{}, "", time.Time{}, ErrInvalidCredentials
+	}
+	if err := s.store.ResetLoginFailures(ctx, keyHash); err != nil {
+		return User{}, "", time.Time{}, err
 	}
 	token, err := NewSessionToken()
 	if err != nil {
 		return User{}, "", time.Time{}, err
 	}
-	now := s.now()
 	expiresAt := now.Add(sessionTTL)
 	if err := s.store.CreateSession(ctx, user.ID, HashSessionToken(token), ipHash, userAgentHash, expiresAt); err != nil {
 		return User{}, "", time.Time{}, err
