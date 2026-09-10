@@ -20,6 +20,7 @@ const (
 	minUsernameLen = 3
 	maxUsernameLen = 32
 	sessionTTL     = 24 * time.Hour
+	recentMFA      = 10 * time.Minute
 )
 
 type User struct {
@@ -35,8 +36,9 @@ type Credential struct {
 }
 
 type Session struct {
-	User User
-	AAL  string
+	User          User
+	AAL           string
+	MFAVerifiedAt *time.Time
 }
 
 type Store interface {
@@ -150,6 +152,15 @@ func (s *Service) AuthenticateSessionState(ctx context.Context, token string) (S
 		return Session{}, ErrInvalidCredentials
 	}
 	return session, nil
+}
+
+func (s *Service) SessionHasRecentMFA(session Session) bool {
+	if session.AAL != "aal2" || session.MFAVerifiedAt == nil {
+		return false
+	}
+	verified := session.MFAVerifiedAt.UTC()
+	now := s.now()
+	return !verified.After(now) && now.Sub(verified) <= recentMFA
 }
 
 func (s *Service) Logout(ctx context.Context, token string) error {
