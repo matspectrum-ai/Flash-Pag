@@ -85,13 +85,15 @@ func (s *PostgresStore) RevokeSession(ctx context.Context, tokenHash string, rev
 
 func (s *PostgresStore) FindSession(ctx context.Context, tokenHash string, now time.Time) (Session, error) {
 	var session Session
-	err := s.pool.QueryRow(ctx, `update public.app_sessions s set last_seen_at = $2 from public.app_users u where s.user_id = u.id and s.token_hash = $1 and s.revoked_at is null and s.expires_at > $2 returning u.id::text, u.username, u.status, s.aal`, tokenHash, now.UTC()).Scan(&session.User.ID, &session.User.Username, &session.User.Status, &session.AAL)
+	var mfaVerifiedAt *time.Time
+	err := s.pool.QueryRow(ctx, `update public.app_sessions s set last_seen_at = $2 from public.app_users u where s.user_id = u.id and s.token_hash = $1 and s.revoked_at is null and s.expires_at > $2 returning u.id::text, u.username, u.status, s.aal, s.mfa_verified_at`, tokenHash, now.UTC()).Scan(&session.User.ID, &session.User.Username, &session.User.Status, &session.AAL, &mfaVerifiedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Session{}, ErrInvalidCredentials
 	}
 	if err != nil {
 		return Session{}, fmt.Errorf("find auth session: %w", err)
 	}
+	session.MFAVerifiedAt = mfaVerifiedAt
 	return session, nil
 }
 
