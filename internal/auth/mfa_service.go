@@ -43,10 +43,14 @@ func NewMFAService(store MFAStore, box *cryptobox.Box) *MFAService {
 }
 
 func (s *MFAService) Status(ctx context.Context, userID string) (bool, error) {
-	if userID == "" { return false, errors.New("invalid mfa status request") }
+	if userID == "" {
+		return false, errors.New("invalid mfa status request")
+	}
 	factor, err := s.store.GetTOTPFactor(ctx, userID)
 	if err != nil {
-		if errors.Is(err, ErrMFANotEnrolled) { return false, nil }
+		if errors.Is(err, ErrMFANotEnrolled) {
+			return false, nil
+		}
 		return false, err
 	}
 	return factor.Enabled && factor.SecretCiphertext != "", nil
@@ -60,44 +64,74 @@ func (s *MFAService) BeginEnrollment(ctx context.Context, userID, accountLabel s
 		return "", "", ErrMFAAlreadyEnrolled
 	}
 	secret, err := GenerateTOTPSecret()
-	if err != nil { return "", "", err }
+	if err != nil {
+		return "", "", err
+	}
 	ciphertext, err := s.box.Seal([]byte(secret))
-	if err != nil { return "", "", err }
+	if err != nil {
+		return "", "", err
+	}
 	factor := TOTPFactor{UserID: userID, SecretCiphertext: ciphertext, Issuer: "Flash Pag", AccountLabel: accountLabel}
-	if err := s.store.CreateTOTPFactor(ctx, factor); err != nil { return "", "", err }
+	if err := s.store.CreateTOTPFactor(ctx, factor); err != nil {
+		return "", "", err
+	}
 	uri, err := BuildTOTPURI(secret, factor.Issuer, factor.AccountLabel)
-	if err != nil { return "", "", err }
+	if err != nil {
+		return "", "", err
+	}
 	return secret, uri, nil
 }
 
 func (s *MFAService) VerifyEnrollment(ctx context.Context, userID, code string) error {
 	factor, err := s.store.GetTOTPFactor(ctx, userID)
-	if err != nil || factor.SecretCiphertext == "" { return ErrMFANotEnrolled }
+	if err != nil || factor.SecretCiphertext == "" {
+		return ErrMFANotEnrolled
+	}
 	secret, err := s.box.Open(factor.SecretCiphertext)
-	if err != nil { return errors.New("mfa secret unavailable") }
+	if err != nil {
+		return errors.New("mfa secret unavailable")
+	}
 	step, ok, err := VerifyTOTP(string(secret), code, s.now())
-	if err != nil || !ok { return ErrMFAInvalidCode }
+	if err != nil || !ok {
+		return ErrMFAInvalidCode
+	}
 	verifiedAt := s.now()
 	if err := s.store.ConfirmTOTPEnrollment(ctx, userID, step, verifiedAt); err != nil {
-		if errors.Is(err, ErrMFAReplay) { return ErrMFAReplay }
+		if errors.Is(err, ErrMFAReplay) {
+			return ErrMFAReplay
+		}
 		return err
 	}
 	return nil
 }
 
 func (s *MFAService) VerifyAndElevate(ctx context.Context, userID, tokenHash, code string) error {
-	if tokenHash == "" { return ErrMFAInvalidSession }
+	if tokenHash == "" {
+		return ErrMFAInvalidSession
+	}
 	factor, err := s.store.GetTOTPFactor(ctx, userID)
-	if err != nil || !factor.Enabled || factor.SecretCiphertext == "" { return ErrMFANotEnrolled }
+	if err != nil || !factor.Enabled || factor.SecretCiphertext == "" {
+		return ErrMFANotEnrolled
+	}
 	secret, err := s.box.Open(factor.SecretCiphertext)
-	if err != nil { return errors.New("mfa secret unavailable") }
+	if err != nil {
+		return errors.New("mfa secret unavailable")
+	}
 	step, ok, err := VerifyTOTP(string(secret), code, s.now())
-	if err != nil || !ok { return ErrMFAInvalidCode }
-	if factor.LastUsedStep != nil && step <= *factor.LastUsedStep { return ErrMFAReplay }
+	if err != nil || !ok {
+		return ErrMFAInvalidCode
+	}
+	if factor.LastUsedStep != nil && step <= *factor.LastUsedStep {
+		return ErrMFAReplay
+	}
 	verifiedAt := s.now()
 	if err := s.store.ConsumeTOTPAndElevate(ctx, userID, tokenHash, step, verifiedAt); err != nil {
-		if errors.Is(err, ErrMFAReplay) { return ErrMFAReplay }
-		if errors.Is(err, ErrMFAInvalidSession) { return ErrMFAInvalidSession }
+		if errors.Is(err, ErrMFAReplay) {
+			return ErrMFAReplay
+		}
+		if errors.Is(err, ErrMFAInvalidSession) {
+			return ErrMFAInvalidSession
+		}
 		return err
 	}
 	return nil
