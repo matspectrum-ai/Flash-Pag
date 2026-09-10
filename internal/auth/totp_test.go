@@ -1,7 +1,9 @@
 package auth
 
-import "testing"
-import "time"
+import (
+	"testing"
+	"time"
+)
 
 func TestGenerateTOTPSecretAndURI(t *testing.T) {
 	secret, err := GenerateTOTPSecret()
@@ -15,8 +17,23 @@ func TestGenerateTOTPSecretAndURI(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildTOTPURI() error = %v", err)
 	}
-	if uri == "" || len(uri) < len("otpauth://totp/") || uri[:14] != "otpauth://totp/" {
+	if len(uri) < len("otpauth://totp/") || uri[:15] != "otpauth://totp/" {
 		t.Fatalf("unexpected otpauth URI: %q", uri)
+	}
+}
+
+func TestVerifyTOTPRFC6238Vector(t *testing.T) {
+	secret := "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
+	step, ok, err := VerifyTOTP(secret, "287082", time.Unix(59, 0).UTC())
+	if err != nil {
+		t.Fatalf("VerifyTOTP() error = %v", err)
+	}
+	if !ok {
+		t.Fatalf("VerifyTOTP() rejected RFC 6238 vector")
+	}
+	wantStep := int64(59 / 30)
+	if step != wantStep {
+		t.Fatalf("accepted step = %d, want %d", step, wantStep)
 	}
 }
 
