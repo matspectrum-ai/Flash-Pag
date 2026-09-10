@@ -209,3 +209,13 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(value)
 }
+
+func writeError(w http.ResponseWriter, status int, code, msg string) {
+	writeJSON(w, status, map[string]any{"error": map[string]string{"code": code, "message": msg}})
+}
+
+func decodeJSON(r *http.Request, out any) error {
+	d := json.NewDecoder(io.LimitReader(r.Body, 1<<20))
+	d.DisallowUnknownFields()
+	return d.Decode(out)
+}
