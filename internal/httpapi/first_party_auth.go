@@ -116,14 +116,14 @@ func (s *Server) firstPartyMe(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) withFirstPartyAuth(next http.HandlerFunc) http.HandlerFunc {
-	return s.withFirstPartySession("", next)
+	return s.withFirstPartySession(false, next)
 }
 
 func (s *Server) withFirstPartyAAL2(next http.HandlerFunc) http.HandlerFunc {
-	return s.withFirstPartySession("aal2", next)
+	return s.withFirstPartySession(true, next)
 }
 
-func (s *Server) withFirstPartySession(requiredAAL string, next http.HandlerFunc) http.HandlerFunc {
+func (s *Server) withFirstPartySession(requireRecentMFA bool, next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !s.firstPartyAuthEnabled() {
 			writeError(w, http.StatusNotFound, "not_found", "endpoint not available")
@@ -140,8 +140,8 @@ func (s *Server) withFirstPartySession(requiredAAL string, next http.HandlerFunc
 			writeError(w, http.StatusUnauthorized, "invalid_session", "session expired or invalid")
 			return
 		}
-		if requiredAAL != "" && session.AAL != requiredAAL {
-			writeError(w, http.StatusForbidden, "mfa_required", "recent multi-factor authentication is required")
+		if requireRecentMFA && !s.auth.SessionHasRecentMFA(session) {
+			writeError(w, http.StatusPreconditionRequired, "mfa_required", "recent multi-factor authentication is required")
 			return
 		}
 		ctx := context.WithValue(r.Context(), firstPartyPrincipalKey, session.User)
