@@ -19,9 +19,8 @@ var (
 type MFAStore interface {
 	GetTOTPFactor(ctx context.Context, userID string) (TOTPFactor, error)
 	CreateTOTPFactor(ctx context.Context, factor TOTPFactor) error
-	EnableTOTPFactor(ctx context.Context, userID string, verifiedAt time.Time, step int64) error
-	ConsumeTOTPCode(ctx context.Context, userID string, step int64, usedAt time.Time) error
-	ElevateSession(ctx context.Context, tokenHash string, verifiedAt time.Time) error
+	ConfirmTOTPEnrollment(ctx context.Context, userID string, step int64, verifiedAt time.Time) error
+	ConsumeTOTPAndElevate(ctx context.Context, userID, tokenHash string, step int64, verifiedAt time.Time) error
 }
 
 type TOTPFactor struct {
@@ -82,13 +81,20 @@ func (s *MFAService) VerifyEnrollment(ctx context.Context, userID, code string) 
 	if err != nil || !ok {
 		return ErrMFAInvalidCode
 	}
-	if factor.LastUsedStep != nil && step <= *factor.LastUsedStep {
-		return ErrMFAReplay
+	verifiedAt := s.now()
+	if err := s.store.ConfirmTOTPEnrollment(ctx, userID, step, verifiedAt); err != nil {
+		if errors.Is(err, ErrMFAReplay) {
+			return ErrMFAReplay
+		}
+		return err
 	}
-	return s.store.EnableTOTPFactor(ctx, userID, s.now(), step)
+	return nil
 }
 
 func (s *MFAService) VerifyAndElevate(ctx context.Context, userID, tokenHash, code string) error {
+	if tokenHash == "" {
+		return ErrMFAInvalidSession
+	}
 	factor, err := s.store.GetTOTPFactor(ctx, userID)
 	if err != nil || !factor.Enabled || factor.SecretCiphertext == "" {
 		return ErrMFANotEnrolled
@@ -105,14 +111,14 @@ func (s *MFAService) VerifyAndElevate(ctx context.Context, userID, tokenHash, co
 		return ErrMFAReplay
 	}
 	verifiedAt := s.now()
-	if err := s.store.ConsumeTOTPCode(ctx, userID, step, verifiedAt); err != nil {
+	if err := s.store.ConsumeTOTPAndElevate(ctx, userID, tokenHash, step, verifiedAt); err != nil {
 		if errors.Is(err, ErrMFAReplay) {
 			return ErrMFAReplay
 		}
+		if errors.Is(err, ErrMFAInvalidSession) {
+			return ErrMFAInvalidSession
+		}
 		return err
-	}
-	if err := s.store.ElevateSession(ctx, tokenHash, verifiedAt); err != nil {
-		return ErrMFAInvalidSession
 	}
 	return nil
 }
