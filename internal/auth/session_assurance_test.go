@@ -11,9 +11,7 @@ func TestSessionHasRecentMFA(t *testing.T) {
 	s.now = func() time.Time { return now }
 
 	verified := now.Add(-9 * time.Minute)
-	if !s.SessionHasRecentMFA(Session{AAL: "aal1", MFAVerifiedAt: &verified}) {
-		// The method intentionally requires aal2, so this remains false.
-	} else {
+	if s.SessionHasRecentMFA(Session{AAL: "aal1", MFAVerifiedAt: &verified}) {
 		t.Fatal("aal1 session incorrectly accepted as recent MFA")
 	}
 	if !s.SessionHasRecentMFA(Session{AAL: "aal2", MFAVerifiedAt: &verified}) {
