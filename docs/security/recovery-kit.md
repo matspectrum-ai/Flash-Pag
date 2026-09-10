@@ -70,7 +70,9 @@ O nome de arquivo é `account-recovery-<account-id>.recovery`. O nome não é se
 
 Criar um novo Recovery Kit revoga atomicamente o kit anterior e invalida challenges pendentes.
 
-Uma recuperação usa um challenge com estados `verified -> consuming -> consumed`. O challenge é curto, único e idempotente em caso de perda da resposta HTTP.
+Uma recuperação usa um challenge com estados `verified -> consuming -> consumed`. A transição para `consuming` é protegida por atualização concorrente no banco. Enquanto estiver em `consuming`, uma falha externa de Auth pode ser repetida dentro da janela do challenge; o backend não tenta desfazer operações externas, pois elas não participam da mesma transação PostgreSQL.
+
+A finalização é atômica: somente um challenge `consuming`, ainda válido e associado a um kit `active` pode marcar o kit como `used` e o challenge como `consumed`. Se a resposta HTTP for perdida depois da finalização, uma nova tentativa não repete a recuperação; o usuário deve tentar entrar novamente com a nova senha.
 
 Depois de `consumed`, o kit passa a `used` e não pode iniciar outra recuperação.
 
