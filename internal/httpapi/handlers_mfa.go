@@ -40,7 +40,7 @@ func (s *Server) consoleMFAEnroll(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "mfa_session_required", "authentication is required to configure the authenticator")
 		return
 	}
-	enrollment, err := s.sb.EnrollTOTP(r.Context(), token, "Google Authenticator", "Flash Pag")
+	enrollment, err := s.sb.EnrollTOTP(r.Context(), token, "Flash Pag")
 	if err != nil {
 		writeError(w, http.StatusBadGateway, "mfa_enroll_failed", "could not start authenticator enrollment")
 		return
