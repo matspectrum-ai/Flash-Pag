@@ -211,18 +211,9 @@ func (c *Client) authRequest(ctx context.Context, accessToken, method, path stri
 }
 
 func (c *Client) ListMFAFactors(ctx context.Context, accessToken string) (MFAFactors, error) {
-	// Supabase's documented REST factor endpoint is not exposed by this project's
-	// PostgREST schema. A narrowly scoped SECURITY DEFINER RPC reads only the
-	// current user's verified TOTP factor ID via auth.uid().
-	var factorID string
-	if err := c.authRequest(ctx, accessToken, http.MethodPost, "/rest/v1/rpc/flashpag_verified_totp_factor", map[string]any{}, &factorID); err != nil {
-		return MFAFactors{}, err
-	}
-	if factorID == "" {
-		return MFAFactors{}, nil
-	}
-	factor := MFAFactor{ID: factorID, Type: "totp", Status: "verified"}
-	return MFAFactors{All: []MFAFactor{factor}, TOTP: []MFAFactor{factor}}, nil
+	var out MFAFactors
+	err := c.authRequest(ctx, accessToken, http.MethodGet, "/auth/v1/factors", nil, &out)
+	return out, err
 }
 
 func (c *Client) EnrollTOTP(ctx context.Context, accessToken, issuer string) (MFAEnrollment, error) {
