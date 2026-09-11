@@ -23,6 +23,7 @@ type Server struct {
 	providers *provider.Registry
 	auth      *auth.Service
 	mfa       *auth.MFAService
+	recovery  *auth.RecoveryService
 	log       *slog.Logger
 	mux       *http.ServeMux
 }
@@ -37,8 +38,8 @@ func New(cfg config.Config, sb *supabase.Client, box *cryptobox.Box, providers *
 	return s
 }
 
-func NewWithMFA(cfg config.Config, sb *supabase.Client, box *cryptobox.Box, providers *provider.Registry, log *slog.Logger, authService *auth.Service, mfaService *auth.MFAService) *Server {
-	s := &Server{cfg: cfg, sb: sb, box: box, providers: providers, auth: authService, mfa: mfaService, log: log, mux: http.NewServeMux()}
+func NewWithMFA(cfg config.Config, sb *supabase.Client, box *cryptobox.Box, providers *provider.Registry, log *slog.Logger, authService *auth.Service, mfaService *auth.MFAService, recoveryService *auth.RecoveryService) *Server {
+	s := &Server{cfg: cfg, sb: sb, box: box, providers: providers, auth: authService, mfa: mfaService, recovery: recoveryService, log: log, mux: http.NewServeMux()}
 	s.routes()
 	return s
 }
@@ -61,6 +62,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /auth/mfa/enroll", s.withFirstPartyOrigin(s.withFirstPartyAuth(s.firstPartyMFAEnroll)))
 	s.mux.HandleFunc("POST /auth/mfa/enroll/verify", s.withFirstPartyOrigin(s.withFirstPartyAuth(s.firstPartyMFAEnrollVerify)))
 	s.mux.HandleFunc("POST /auth/mfa/step-up", s.withFirstPartyOrigin(s.withFirstPartyAuth(s.firstPartyMFAStepUp)))
+	s.mux.HandleFunc("POST /auth/recovery/challenge", s.withFirstPartyOrigin(s.firstPartyRecoveryChallenge))
+	s.mux.HandleFunc("POST /auth/recovery/reset-password", s.withFirstPartyOrigin(s.firstPartyRecoveryResetPassword))
 
 	s.mux.HandleFunc("POST /console/register", s.register)
 	s.mux.HandleFunc("POST /console/session", s.login)
