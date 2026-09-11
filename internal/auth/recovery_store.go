@@ -19,16 +19,17 @@ type RecoveryKitRecord struct {
 }
 
 type RecoveryChallenge struct {
-	ID              string
-	UserID          string
-	KeyID           string
-	Status          string
-	AttemptID       string
-	LeaseExpiresAt  time.Time
-	ExpiresAt       time.Time
+	ID             string
+	UserID         string
+	KeyID          string
+	Status         string
+	AttemptID      string
+	LeaseExpiresAt time.Time
+	ExpiresAt      time.Time
 }
 
 type RecoveryStore interface {
+	RotateRecoveryKit(ctx context.Context, userID, keyID, secretVerifier string) error
 	GetRecoveryKit(ctx context.Context, userID, keyID string) (RecoveryKitRecord, error)
 	CreateRecoveryChallenge(ctx context.Context, userID, keyID, tokenHash string, expiresAt time.Time) (string, error)
 	BeginRecoveryReset(ctx context.Context, challengeID, tokenHash string) (RecoveryChallenge, error)
@@ -45,19 +46,23 @@ func NewPostgresRecoveryStore(pool *pgxpool.Pool) *PostgresRecoveryStore {
 	return &PostgresRecoveryStore{pool: pool}
 }
 
+func (s *PostgresRecoveryStore) RotateRecoveryKit(ctx context.Context, userID, keyID, secretVerifier string) error {
+	if s == nil || s.pool == nil || userID == "" || keyID == "" || secretVerifier == "" {
+		return ErrRecoveryUnavailable
+	}
+	if _, err := s.pool.Exec(ctx, `select public.flashpag_rotate_app_recovery_kit($1::uuid, $2, $3)`, userID, keyID, secretVerifier); err != nil {
+		return fmt.Errorf("rotate first-party recovery kit: %w", err)
+	}
+	return nil
+}
+
 func (s *PostgresRecoveryStore) GetRecoveryKit(ctx context.Context, userID, keyID string) (RecoveryKitRecord, error) {
 	var record RecoveryKitRecord
 	err := s.pool.QueryRow(ctx, `
 		select user_id::text, key_id, version, secret_verifier, status
 		from public.app_account_recovery_kits
 		where user_id = $1::uuid and key_id = $2 and status = 'active'
-	`, userID, keyID).Scan(
-		&record.UserID,
-		&record.KeyID,
-		&record.Version,
-		&record.SecretVerifier,
-		&record.Status,
-	)
+	`, userID, keyID).Scan(&record.UserID, &record.KeyID, &record.Version, &record.SecretVerifier, &record.Status)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return RecoveryKitRecord{}, ErrRecoveryUnavailable
 	}
@@ -85,14 +90,7 @@ func (s *PostgresRecoveryStore) BeginRecoveryReset(ctx context.Context, challeng
 	err := s.pool.QueryRow(ctx, `
 		select user_id::text, key_id, status, attempt_id::text, lease_expires_at, expires_at
 		from public.flashpag_begin_app_recovery_reset($1::uuid, $2)
-	`, challengeID, tokenHash).Scan(
-		&challenge.UserID,
-		&challenge.KeyID,
-		&challenge.Status,
-		&challenge.AttemptID,
-		&challenge.LeaseExpiresAt,
-		&challenge.ExpiresAt,
-	)
+	`, challengeID, tokenHash).Scan(&challenge.UserID, &challenge.KeyID, &challenge.Status, &challenge.AttemptID, &challenge.LeaseExpiresAt, &challenge.ExpiresAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return RecoveryChallenge{}, ErrRecoveryUnavailable
 	}
