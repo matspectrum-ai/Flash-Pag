@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"strings"
@@ -28,10 +29,18 @@ type RecoveryService struct {
 }
 
 type RecoveryKitState struct {
-	UserID      string
-	KeyID       string
-	Filename    string
+	UserID        string
+	KeyID         string
+	Filename      string
 	ContentBase64 string
+	CreatedAt     time.Time
+}
+
+type RecoveryStatus struct {
+	Configured bool
+	CreatedAt  time.Time
+	RotatedAt  *time.Time
+	KeyID      string
 }
 
 type RecoveryChallengeState struct {
@@ -66,7 +75,27 @@ func (s *RecoveryService) CreateKit(ctx context.Context, userID string) (Recover
 		UserID:        userID,
 		KeyID:         kit.KeyID,
 		Filename:      "account-recovery-" + userID + ".recovery",
-		ContentBase64: hex.EncodeToString(data),
+		ContentBase64: base64.StdEncoding.EncodeToString(data),
+		CreatedAt:     s.now(),
+	}, nil
+}
+
+func (s *RecoveryService) Status(ctx context.Context, userID string) (RecoveryStatus, error) {
+	if s == nil || s.store == nil || strings.TrimSpace(userID) == "" {
+		return RecoveryStatus{}, ErrRecoveryUnavailable
+	}
+	record, err := s.store.GetActiveRecoveryKit(ctx, userID)
+	if err != nil {
+		if errors.Is(err, ErrRecoveryUnavailable) {
+			return RecoveryStatus{Configured: false}, nil
+		}
+		return RecoveryStatus{}, err
+	}
+	return RecoveryStatus{
+		Configured: true,
+		CreatedAt:  record.CreatedAt,
+		RotatedAt:  record.RotatedAt,
+		KeyID:      record.KeyID,
 	}, nil
 }
 
@@ -110,9 +139,8 @@ func (s *RecoveryService) BeginChallenge(ctx context.Context, identifier string,
 		return RecoveryChallengeState{}, ErrRecoveryUnavailable
 	}
 	token := hex.EncodeToString(rawToken[:])
-	tokenSum := sha256.Sum256([]byte(token))
 	expiresAt := s.now().Add(firstPartyRecoveryTTL)
-	challengeID, err := s.store.CreateRecoveryChallenge(ctx, kit.AccountID, kit.KeyID, hex.EncodeToString(tokenSum[:]), expiresAt)
+	challengeID, err := s.store.CreateRecoveryChallenge(ctx, kit.AccountID, kit.KeyID, RecoveryTokenHash(token), expiresAt)
 	if err != nil {
 		return RecoveryChallengeState{}, err
 	}
@@ -129,8 +157,7 @@ func (s *RecoveryService) ResetPassword(ctx context.Context, challengeID, token,
 	if strings.TrimSpace(challengeID) == "" || strings.TrimSpace(token) == "" || strings.TrimSpace(userID) == "" || strings.TrimSpace(keyID) == "" {
 		return ErrRecoveryUnavailable
 	}
-	tokenSum := sha256.Sum256([]byte(token))
-	claim, err := s.store.BeginRecoveryReset(ctx, challengeID, hex.EncodeToString(tokenSum[:]))
+	claim, err := s.store.BeginRecoveryReset(ctx, challengeID, RecoveryTokenHash(token))
 	if err != nil {
 		return ErrRecoveryUnavailable
 	}
