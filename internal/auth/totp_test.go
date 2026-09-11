@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+const testTOTPSecret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
+
 func TestGenerateTOTPSecretAndURI(t *testing.T) {
 	secret, err := GenerateTOTPSecret()
 	if err != nil {
@@ -23,8 +25,7 @@ func TestGenerateTOTPSecretAndURI(t *testing.T) {
 }
 
 func TestVerifyTOTPRFC6238Vector(t *testing.T) {
-	secret := "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
-	step, ok, err := VerifyTOTP(secret, "287082", time.Unix(59, 0).UTC())
+	step, ok, err := VerifyTOTP(testTOTPSecret, "287082", time.Unix(59, 0).UTC())
 	if err != nil {
 		t.Fatalf("VerifyTOTP() error = %v", err)
 	}
@@ -38,15 +39,14 @@ func TestVerifyTOTPRFC6238Vector(t *testing.T) {
 }
 
 func TestVerifyTOTPAllowsAdjacentStep(t *testing.T) {
-	secret := "JBSWY3DPEHPK3PXP"
 	now := time.Unix(1700000000, 0).UTC()
 	step := now.Unix() / 30
-	decoded, err := decodeTOTPSecret(secret)
+	decoded, err := decodeTOTPSecret(testTOTPSecret)
 	if err != nil {
 		t.Fatalf("decodeTOTPSecret() error = %v", err)
 	}
 	code := totpCode(decoded, step-1)
-	gotStep, ok, err := VerifyTOTP(secret, code, now)
+	gotStep, ok, err := VerifyTOTP(testTOTPSecret, code, now)
 	if err != nil {
 		t.Fatalf("VerifyTOTP() error = %v", err)
 	}
@@ -56,15 +56,14 @@ func TestVerifyTOTPAllowsAdjacentStep(t *testing.T) {
 }
 
 func TestVerifyTOTPCorrectCodeAndRejectsWrongCode(t *testing.T) {
-	secret := "JBSWY3DPEHPK3PXP"
 	now := time.Unix(1700000000, 0).UTC()
 	step := now.Unix() / 30
-	decoded, err := decodeTOTPSecret(secret)
+	decoded, err := decodeTOTPSecret(testTOTPSecret)
 	if err != nil {
 		t.Fatalf("decodeTOTPSecret() error = %v", err)
 	}
 	code := totpCode(decoded, step)
-	gotStep, ok, err := VerifyTOTP(secret, code, now)
+	gotStep, ok, err := VerifyTOTP(testTOTPSecret, code, now)
 	if err != nil || !ok || gotStep != step {
 		t.Fatalf("valid VerifyTOTP() = (%d, %t, %v), want (%d, true, nil)", gotStep, ok, err, step)
 	}
@@ -72,7 +71,7 @@ func TestVerifyTOTPCorrectCodeAndRejectsWrongCode(t *testing.T) {
 	if wrong == code {
 		wrong = "999999"
 	}
-	if _, ok, err := VerifyTOTP(secret, wrong, now); err != nil || ok {
+	if _, ok, err := VerifyTOTP(testTOTPSecret, wrong, now); err != nil || ok {
 		t.Fatalf("wrong VerifyTOTP() = (%t, %v), want (false, nil)", ok, err)
 	}
 }
