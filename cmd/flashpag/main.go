@@ -43,6 +43,7 @@ func main() {
 	var authStore *auth.PostgresStore
 	var mfaStore *auth.PostgresMFAStore
 	var mfaService *auth.MFAService
+	var recoveryService *auth.RecoveryService
 	if cfg.FirstPartyAuthEnabled {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		pool, openErr := db.Open(ctx, cfg.DatabaseURL)
@@ -60,13 +61,14 @@ func main() {
 		}
 		authService = auth.NewService(authStore)
 		mfaService = auth.NewMFAService(mfaStore, box)
+		recoveryService = auth.NewRecoveryService(authStore.RecoveryStore(), cfg.MasterKey)
 		log.Info("first-party auth storage enabled")
 	}
 
 	providers := provider.NewRegistry(providermock.New(), providerpixhub.New())
 	var app *httpapi.Server
 	if cfg.FirstPartyAuthEnabled {
-		app = httpapi.NewWithMFA(cfg, sb, box, providers, log, authService, mfaService)
+		app = httpapi.NewWithMFA(cfg, sb, box, providers, log, authService, mfaService, recoveryService)
 	} else {
 		app = httpapi.New(cfg, sb, box, providers, log, authService)
 	}
