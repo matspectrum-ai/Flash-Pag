@@ -53,7 +53,6 @@ func (s *Server) firstPartyRecoverySetup(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusInternalServerError, "recovery_setup_failed", "could not create the recovery kit")
 		return
 	}
-	_ = s.recordFirstPartySecurityEvent(r, user.ID, "recovery.created", "succeeded")
 	w.Header().Set("Cache-Control", "no-store")
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":             true,
@@ -167,7 +166,6 @@ func (s *Server) firstPartyRecoveryResetPassword(w http.ResponseWriter, r *http.
 	clearCookie(w, firstPartyRecoveryCookie, s.cfg.CookieSecure)
 	clearCookie(w, firstPartySessionCookie, s.cfg.CookieSecure)
 	w.Header().Set("Cache-Control", "no-store")
-	_ = s.recordFirstPartySecurityEvent(r, state.UserID, "recovery.password_reset", "succeeded")
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":                         true,
 		"login_required":             true,
