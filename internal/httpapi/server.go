@@ -62,6 +62,8 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /auth/mfa/enroll", s.withFirstPartyOrigin(s.withFirstPartyAuth(s.firstPartyMFAEnroll)))
 	s.mux.HandleFunc("POST /auth/mfa/enroll/verify", s.withFirstPartyOrigin(s.withFirstPartyAuth(s.firstPartyMFAEnrollVerify)))
 	s.mux.HandleFunc("POST /auth/mfa/step-up", s.withFirstPartyOrigin(s.withFirstPartyAuth(s.firstPartyMFAStepUp)))
+	s.mux.HandleFunc("GET /auth/recovery/status", s.withFirstPartyAuth(s.firstPartyRecoveryStatus))
+	s.mux.HandleFunc("POST /auth/recovery/setup", s.withFirstPartyOrigin(s.withFirstPartyAAL2(s.firstPartyRecoverySetup)))
 	s.mux.HandleFunc("POST /auth/recovery/challenge", s.withFirstPartyOrigin(s.firstPartyRecoveryChallenge))
 	s.mux.HandleFunc("POST /auth/recovery/reset-password", s.withFirstPartyOrigin(s.firstPartyRecoveryResetPassword))
 
