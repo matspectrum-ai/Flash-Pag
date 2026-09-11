@@ -25,6 +25,44 @@ func (s *Server) firstPartyRecoveryEnabled() bool {
 	return s.cfg.FirstPartyAuthEnabled && s.recovery != nil && s.box != nil
 }
 
+func (s *Server) firstPartyRecoveryStatus(w http.ResponseWriter, r *http.Request) {
+	if !s.firstPartyRecoveryEnabled() {
+		writeError(w, http.StatusNotFound, "not_found", "endpoint not available")
+		return
+	}
+	status, err := s.recovery.Status(r.Context(), firstPartyP(r.Context()).ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "recovery_status_failed", "could not read recovery status")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"configured": status.Configured,
+		"created_at": status.CreatedAt,
+		"rotated_at": status.RotatedAt,
+	})
+}
+
+func (s *Server) firstPartyRecoverySetup(w http.ResponseWriter, r *http.Request) {
+	if !s.firstPartyRecoveryEnabled() {
+		writeError(w, http.StatusNotFound, "not_found", "endpoint not available")
+		return
+	}
+	user := firstPartyP(r.Context())
+	state, err := s.recovery.CreateKit(r.Context(), user.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "recovery_setup_failed", "could not create the recovery kit")
+		return
+	}
+	_ = s.recordFirstPartySecurityEvent(r, user.ID, "recovery.created", "succeeded")
+	w.Header().Set("Cache-Control", "no-store")
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ok":             true,
+		"filename":       state.Filename,
+		"content_base64": state.ContentBase64,
+		"created_at":     state.CreatedAt,
+	})
+}
+
 func (s *Server) firstPartyRecoveryChallenge(w http.ResponseWriter, r *http.Request) {
 	if !s.firstPartyRecoveryEnabled() {
 		writeError(w, http.StatusNotFound, "not_found", "endpoint not available")
@@ -129,6 +167,7 @@ func (s *Server) firstPartyRecoveryResetPassword(w http.ResponseWriter, r *http.
 	clearCookie(w, firstPartyRecoveryCookie, s.cfg.CookieSecure)
 	clearCookie(w, firstPartySessionCookie, s.cfg.CookieSecure)
 	w.Header().Set("Cache-Control", "no-store")
+	_ = s.recordFirstPartySecurityEvent(r, state.UserID, "recovery.password_reset", "succeeded")
 	writeJSON(w, http.StatusOK, map[string]any{
 		"ok":                         true,
 		"login_required":             true,
