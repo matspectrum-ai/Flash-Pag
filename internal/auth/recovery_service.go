@@ -27,6 +27,13 @@ type RecoveryService struct {
 	now       func() time.Time
 }
 
+type RecoveryKitState struct {
+	UserID      string
+	KeyID       string
+	Filename    string
+	ContentBase64 string
+}
+
 type RecoveryChallengeState struct {
 	ID        string
 	Token     string
@@ -37,11 +44,30 @@ type RecoveryChallengeState struct {
 
 func NewRecoveryService(store RecoveryStore, serverKey []byte) *RecoveryService {
 	key := append([]byte(nil), serverKey...)
-	return &RecoveryService{
-		store:     store,
-		serverKey: key,
-		now:       func() time.Time { return time.Now().UTC() },
+	return &RecoveryService{store: store, serverKey: key, now: func() time.Time { return time.Now().UTC() }}
+}
+
+func (s *RecoveryService) CreateKit(ctx context.Context, userID string) (RecoveryKitState, error) {
+	if s == nil || s.store == nil || len(s.serverKey) < 32 || strings.TrimSpace(userID) == "" {
+		return RecoveryKitState{}, ErrRecoveryUnavailable
 	}
+	kit, data, err := recovery.Generate(userID, s.serverKey)
+	if err != nil {
+		return RecoveryKitState{}, ErrRecoveryUnavailable
+	}
+	verifier, err := recovery.Verifier(s.serverKey, kit.Secret[:])
+	if err != nil {
+		return RecoveryKitState{}, ErrRecoveryUnavailable
+	}
+	if err := s.store.RotateRecoveryKit(ctx, userID, kit.KeyID, verifier); err != nil {
+		return RecoveryKitState{}, err
+	}
+	return RecoveryKitState{
+		UserID:        userID,
+		KeyID:         kit.KeyID,
+		Filename:      "account-recovery-" + userID + ".recovery",
+		ContentBase64: hex.EncodeToString(data),
+	}, nil
 }
 
 func (s *RecoveryService) BeginChallenge(ctx context.Context, identifier string, kitData []byte, ipHash string) (RecoveryChallengeState, error) {
@@ -52,7 +78,6 @@ func (s *RecoveryService) BeginChallenge(ctx context.Context, identifier string,
 	if identifier == "" || len(kitData) == 0 || len(kitData) > 4096 {
 		return RecoveryChallengeState{}, ErrRecoveryUnavailable
 	}
-
 	subjectHash, err := recovery.RateHash(s.serverKey, "subject", identifier)
 	if err != nil {
 		return RecoveryChallengeState{}, ErrRecoveryUnavailable
@@ -68,7 +93,6 @@ func (s *RecoveryService) BeginChallenge(ctx context.Context, identifier string,
 	if !allowed {
 		return RecoveryChallengeState{}, ErrRecoveryRateLimited
 	}
-
 	kit, err := recovery.Parse(kitData, s.serverKey)
 	if err != nil || !strings.EqualFold(strings.TrimSpace(kit.AccountID), identifier) {
 		return RecoveryChallengeState{}, ErrRecoveryUnavailable
@@ -81,7 +105,6 @@ func (s *RecoveryService) BeginChallenge(ctx context.Context, identifier string,
 	if err != nil || len(record.SecretVerifier) != len(verifier) || subtle.ConstantTimeCompare([]byte(verifier), []byte(record.SecretVerifier)) != 1 {
 		return RecoveryChallengeState{}, ErrRecoveryUnavailable
 	}
-
 	var rawToken [32]byte
 	if _, err := rand.Read(rawToken[:]); err != nil {
 		return RecoveryChallengeState{}, ErrRecoveryUnavailable
@@ -93,13 +116,7 @@ func (s *RecoveryService) BeginChallenge(ctx context.Context, identifier string,
 	if err != nil {
 		return RecoveryChallengeState{}, err
 	}
-	return RecoveryChallengeState{
-		ID:        challengeID,
-		Token:     token,
-		UserID:    kit.AccountID,
-		KeyID:     kit.KeyID,
-		ExpiresAt: expiresAt,
-	}, nil
+	return RecoveryChallengeState{ID: challengeID, Token: token, UserID: kit.AccountID, KeyID: kit.KeyID, ExpiresAt: expiresAt}, nil
 }
 
 func (s *RecoveryService) ResetPassword(ctx context.Context, challengeID, token, userID, keyID, password, passwordConfirm string) error {
@@ -112,7 +129,6 @@ func (s *RecoveryService) ResetPassword(ctx context.Context, challengeID, token,
 	if strings.TrimSpace(challengeID) == "" || strings.TrimSpace(token) == "" || strings.TrimSpace(userID) == "" || strings.TrimSpace(keyID) == "" {
 		return ErrRecoveryUnavailable
 	}
-
 	tokenSum := sha256.Sum256([]byte(token))
 	claim, err := s.store.BeginRecoveryReset(ctx, challengeID, hex.EncodeToString(tokenSum[:]))
 	if err != nil {
@@ -121,7 +137,6 @@ func (s *RecoveryService) ResetPassword(ctx context.Context, challengeID, token,
 	if claim.Status != "consuming" || claim.UserID != userID || claim.KeyID != keyID || claim.AttemptID == "" {
 		return ErrRecoveryUnavailable
 	}
-
 	hash, err := HashPassword(password)
 	if err != nil {
 		_, _ = s.store.AbortRecoveryReset(ctx, challengeID, claim.UserID, claim.KeyID, claim.AttemptID)
