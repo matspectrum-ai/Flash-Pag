@@ -48,6 +48,7 @@ func TestFirstPartyRecoveryFoundationLifecycle(t *testing.T) {
 	const keyID = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	const verifier = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	const challengeTokenHash = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+	const passwordHash = "$argon2id$v=19$m=65536,t=3,p=4$fixture$fixture"
 	if _, err := tx.Exec(ctx, `insert into app_users (id, username, username_normalized, status) values ($1::uuid, 'mateus', 'mateus', 'active')`, userID); err != nil {
 		t.Fatalf("seed user: %v", err)
 	}
@@ -84,12 +85,18 @@ func TestFirstPartyRecoveryFoundationLifecycle(t *testing.T) {
 		t.Fatalf("second recovery claim error = %v, want no rows", err)
 	}
 
-	var finalized bool
-	if err := tx.QueryRow(ctx, `select public.flashpag_finalize_app_recovery_reset($1::uuid, $2::uuid, $3, $4::uuid)`, challengeID, userID, keyID, attemptID).Scan(&finalized); err != nil {
-		t.Fatalf("finalize recovery reset: %v", err)
+	var applied bool
+	if err := tx.QueryRow(ctx, `select public.flashpag_apply_app_recovery_reset($1::uuid, $2::uuid, $3, $4::uuid, $5)`, challengeID, userID, keyID, attemptID, passwordHash).Scan(&applied); err != nil {
+		t.Fatalf("apply recovery reset: %v", err)
 	}
-	if !finalized {
-		t.Fatal("finalize recovery reset = false, want true")
+	if !applied {
+		t.Fatal("apply recovery reset = false, want true")
+	}
+	if err := tx.QueryRow(ctx, `select password_hash from app_password_credentials where user_id = $1::uuid`, userID).Scan(&status); err != nil {
+		t.Fatalf("read password credential: %v", err)
+	}
+	if status != passwordHash {
+		t.Fatalf("password hash = %q, want fixture hash", status)
 	}
 	if err := tx.QueryRow(ctx, `select status from app_account_recovery_challenges where id = $1::uuid`, challengeID).Scan(&status); err != nil {
 		t.Fatalf("read challenge status: %v", err)
@@ -101,7 +108,7 @@ func TestFirstPartyRecoveryFoundationLifecycle(t *testing.T) {
 		t.Fatalf("read used kit status: %v", err)
 	}
 	if status != "used" {
-		t.Fatalf("recovery kit status after finalize = %q, want used", status)
+		t.Fatalf("recovery kit status after apply = %q, want used", status)
 	}
 	if err := tx.Rollback(ctx); err != nil && err != pgx.ErrTxClosed {
 		t.Fatalf("rollback transaction: %v", err)
@@ -189,11 +196,16 @@ func applyRecoveryFoundationFixture(t *testing.T, ctx context.Context, tx pgx.Tx
 			t.Fatalf("create recovery fixture schema: %v", err)
 		}
 	}
-	data, err := os.ReadFile(filepath.Join(root, "migrations", "0023_first_party_recovery_foundation.sql"))
-	if err != nil {
-		t.Fatalf("read 0023 migration: %v", err)
-	}
-	if _, err := tx.Exec(ctx, string(data)); err != nil {
-		t.Fatalf("apply 0023 migration: %v", err)
+	for _, migration := range []string{
+		"0023_first_party_recovery_foundation.sql",
+		"0024_first_party_recovery_atomic_reset.sql",
+	} {
+		data, err := os.ReadFile(filepath.Join(root, "migrations", migration))
+		if err != nil {
+			t.Fatalf("read %s migration: %v", migration, err)
+		}
+		if _, err := tx.Exec(ctx, string(data)); err != nil {
+			t.Fatalf("apply %s migration: %v", migration, err)
+		}
 	}
 }
