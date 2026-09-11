@@ -25,6 +25,13 @@ func (s *PostgresStore) Close() {
 	}
 }
 
+func (s *PostgresStore) RecoveryStore() *PostgresRecoveryStore {
+	if s == nil {
+		return nil
+	}
+	return NewPostgresRecoveryStore(s.pool)
+}
+
 func (s *PostgresStore) FindUserByUsername(ctx context.Context, usernameNormalized string) (User, error) {
 	var user User
 	err := s.pool.QueryRow(ctx, `select id::text, username, status from public.app_users where username_normalized = $1 limit 1`, usernameNormalized).Scan(&user.ID, &user.Username, &user.Status)
