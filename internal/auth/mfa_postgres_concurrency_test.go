@@ -35,15 +35,17 @@ func TestPostgresMFAStoreConcurrentReplay(t *testing.T) {
 
 	const userID = "11111111-1111-4111-8111-111111111111"
 	const sessionHash = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-	if _, err := pool.Exec(ctx, `
-		insert into app_users (id, username, username_normalized, status)
-		values ($1::uuid, 'mfa-test', 'mfa-test', 'active');
-		insert into app_sessions (user_id, token_hash, expires_at, last_seen_at, aal)
-		values ($1::uuid, $2, now() + interval '1 hour', now(), 'aal1');
-		insert into app_totp_factors (user_id, secret_ciphertext, issuer, account_label, enabled_at, last_used_step)
-		values ($1::uuid, 'ciphertext', 'Flash Pag', 'mfa-test', now(), null);
-	`, userID, sessionHash); err != nil {
-		t.Fatalf("seed schema: %v", err)
+	for _, args := range []struct {
+		sql  string
+		args []any
+	}{
+		{`insert into app_users (id, username, username_normalized, status) values ($1::uuid, 'mfa-test', 'mfa-test', 'active')`, []any{userID}},
+		{`insert into app_sessions (user_id, token_hash, expires_at, last_seen_at, aal) values ($1::uuid, $2, now() + interval '1 hour', now(), 'aal1')`, []any{userID, sessionHash}},
+		{`insert into app_totp_factors (user_id, secret_ciphertext, issuer, account_label, enabled_at, last_used_step) values ($1::uuid, 'ciphertext', 'Flash Pag', 'mfa-test', now(), null)`, []any{userID}},
+	} {
+		if _, err := pool.Exec(ctx, args.sql, args.args...); err != nil {
+			t.Fatalf("seed schema: %v", err)
+		}
 	}
 
 	store := NewPostgresMFAStore(pool)
