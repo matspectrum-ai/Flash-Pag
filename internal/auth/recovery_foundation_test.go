@@ -29,6 +29,10 @@ func TestFirstPartyRecoveryFoundationLifecycle(t *testing.T) {
 		t.Fatalf("ping postgres: %v", err)
 	}
 
+	if _, err := pool.Exec(ctx, `do $$ begin if not exists (select 1 from pg_roles where rolname = 'service_role') then create role service_role nologin; end if; if not exists (select 1 from pg_roles where rolname = 'anon') then create role anon nologin; end if; if not exists (select 1 from pg_roles where rolname = 'authenticated') then create role authenticated nologin; end if; end $$`); err != nil {
+		t.Fatalf("create recovery fixture roles: %v", err)
+	}
+
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		t.Fatalf("begin transaction: %v", err)
@@ -57,11 +61,7 @@ func TestFirstPartyRecoveryFoundationLifecycle(t *testing.T) {
 	}
 
 	var challengeID string
-	if err := tx.QueryRow(ctx, `
-		insert into app_account_recovery_challenges(user_id, key_id, token_hash, expires_at)
-		values ($1::uuid, $2, $3, now() + interval '15 minutes')
-		returning id::text
-	`, userID, keyID, challengeTokenHash).Scan(&challengeID); err != nil {
+	if err := tx.QueryRow(ctx, `insert into app_account_recovery_challenges(user_id, key_id, token_hash, expires_at) values ($1::uuid, $2, $3, now() + interval '15 minutes') returning id::text`, userID, keyID, challengeTokenHash).Scan(&challengeID); err != nil {
 		t.Fatalf("create recovery challenge: %v", err)
 	}
 
@@ -101,22 +101,19 @@ func TestFirstPartyRecoveryFoundationLifecycle(t *testing.T) {
 
 func applyRecoveryFoundationFixture(t *testing.T, ctx context.Context, tx pgx.Tx) {
 	t.Helper()
-
-	for _, stmt := range []string{
-		`create extension if not exists pgcrypto;`,
-		`do $$ begin if not exists (select 1 from pg_roles where rolname = 'service_role') then create role service_role; end if; if not exists (select 1 from pg_roles where rolname = 'anon') then create role anon; end if; if not exists (select 1 from pg_roles where rolname = 'authenticated') then create role authenticated; end if; end $$;`,
-		`create table app_users (id uuid primary key, username text not null, username_normalized text not null unique, status text not null);`,
-	} {
-		if _, err := tx.Exec(ctx, stmt); err != nil {
-			t.Fatalf("create recovery fixture schema: %v", err)
-		}
-	}
-
 	_, thisFile, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("runtime.Caller failed")
 	}
 	root := filepath.Clean(filepath.Join(filepath.Dir(thisFile), "..", ".."))
+	for _, stmt := range []string{
+		`create extension if not exists pgcrypto`,
+		`create table app_users (id uuid primary key, username text not null, username_normalized text not null unique, status text not null)`,
+	} {
+		if _, err := tx.Exec(ctx, stmt); err != nil {
+			t.Fatalf("create recovery fixture schema: %v", err)
+		}
+	}
 	data, err := os.ReadFile(filepath.Join(root, "migrations", "0023_first_party_recovery_foundation.sql"))
 	if err != nil {
 		t.Fatalf("read 0023 migration: %v", err)
