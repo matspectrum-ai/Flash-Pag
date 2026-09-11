@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"testing"
 	"time"
@@ -16,11 +17,25 @@ type recoveryStoreStub struct {
 	challenge       RecoveryChallenge
 	applyCalls      int
 	abortCalls      int
+	rotateCalls     int
 	lastPasswordHash string
+}
+
+func (s *recoveryStoreStub) RotateRecoveryKit(_ context.Context, userID, keyID, secretVerifier string) error {
+	s.rotateCalls++
+	s.kit = RecoveryKitRecord{UserID: userID, KeyID: keyID, Version: 1, SecretVerifier: secretVerifier, Status: "active"}
+	return nil
 }
 
 func (s *recoveryStoreStub) GetRecoveryKit(context.Context, string, string) (RecoveryKitRecord, error) {
 	if s.kit.Status == "" {
+		return RecoveryKitRecord{}, ErrRecoveryUnavailable
+	}
+	return s.kit, nil
+}
+
+func (s *recoveryStoreStub) GetActiveRecoveryKit(context.Context, string) (RecoveryKitRecord, error) {
+	if s.kit.Status != "active" {
 		return RecoveryKitRecord{}, ErrRecoveryUnavailable
 	}
 	return s.kit, nil
@@ -53,6 +68,27 @@ func (s *recoveryStoreStub) AbortRecoveryReset(context.Context, string, string, 
 
 func (s *recoveryStoreStub) AllowRecoveryAttempt(context.Context, string, string, int, int) (bool, error) {
 	return s.allow, nil
+}
+
+func TestRecoveryServiceCreateKitUsesPortableBase64(t *testing.T) {
+	serverKey := bytesOf('k', 32)
+	stub := &recoveryStoreStub{}
+	service := NewRecoveryService(stub, serverKey)
+
+	state, err := service.CreateKit(context.Background(), "11111111-1111-4111-8111-111111111111")
+	if err != nil {
+		t.Fatalf("create kit: %v", err)
+	}
+	if stub.rotateCalls != 1 {
+		t.Fatalf("rotate calls = %d, want 1", stub.rotateCalls)
+	}
+	data, err := base64.StdEncoding.DecodeString(state.ContentBase64)
+	if err != nil {
+		t.Fatalf("decode kit base64: %v", err)
+	}
+	if _, err := recovery.Parse(data, serverKey); err != nil {
+		t.Fatalf("decode kit: %v", err)
+	}
 }
 
 func TestRecoveryServiceBeginChallengeVerifiesKitBeforeIssuingToken(t *testing.T) {
