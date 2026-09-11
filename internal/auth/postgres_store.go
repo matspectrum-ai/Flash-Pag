@@ -68,7 +68,7 @@ func (s *PostgresStore) GetCredential(ctx context.Context, userID string) (Crede
 }
 
 func (s *PostgresStore) CreateSession(ctx context.Context, userID, tokenHash, ipHash, userAgentHash string, expiresAt time.Time) error {
-	_, err := s.pool.Exec(ctx, `insert into public.app_sessions (user_id, token_hash, expires_at, last_seen_at, ip_hash, user_agent_hash) values ($1::uuid, $2, $3, $4, nullif($5, ''), nullif($6, ''))`, userID, tokenHash, expiresAt.UTC(), expiresAt.UTC(), ipHash, userAgentHash)
+	_, err := s.pool.Exec(ctx, `insert into public.app_sessions (user_id, token_hash, expires_at, last_seen_at, ip_hash, user_agent_hash) values ($1::uuid, $2, $3, now(), nullif($4, ''), nullif($5, ''))`, userID, tokenHash, expiresAt.UTC(), ipHash, userAgentHash)
 	if err != nil {
 		return fmt.Errorf("create auth session: %w", err)
 	}
