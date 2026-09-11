@@ -20,6 +20,7 @@ const (
 	minUsernameLen = 3
 	maxUsernameLen = 32
 	sessionTTL     = 24 * time.Hour
+	recentMFA      = 10 * time.Minute
 )
 
 type User struct {
@@ -34,13 +35,19 @@ type Credential struct {
 	MustChange   bool
 }
 
+type Session struct {
+	User          User
+	AAL           string
+	MFAVerifiedAt *time.Time
+}
+
 type Store interface {
 	FindUserByUsername(ctx context.Context, usernameNormalized string) (User, error)
 	CreateUser(ctx context.Context, user User, credential Credential) error
 	GetCredential(ctx context.Context, userID string) (Credential, error)
 	CreateSession(ctx context.Context, userID, tokenHash, ipHash, userAgentHash string, expiresAt time.Time) error
 	RevokeSession(ctx context.Context, tokenHash string, revokedAt time.Time) error
-	FindSessionUser(ctx context.Context, tokenHash string, now time.Time) (User, error)
+	FindSession(ctx context.Context, tokenHash string, now time.Time) (Session, error)
 	AllowLogin(ctx context.Context, keyHash, usernameHash, ipHash string, now time.Time) (bool, error)
 	RecordLoginFailure(ctx context.Context, keyHash, usernameHash, ipHash string, now time.Time) error
 	ResetLoginFailures(ctx context.Context, keyHash string) error
@@ -129,14 +136,31 @@ func (s *Service) Authenticate(ctx context.Context, username, password, ipHash, 
 }
 
 func (s *Service) AuthenticateSession(ctx context.Context, token string) (User, error) {
+	session, err := s.AuthenticateSessionState(ctx, token)
+	if err != nil {
+		return User{}, err
+	}
+	return session.User, nil
+}
+
+func (s *Service) AuthenticateSessionState(ctx context.Context, token string) (Session, error) {
 	if strings.TrimSpace(token) == "" {
-		return User{}, ErrInvalidCredentials
+		return Session{}, ErrInvalidCredentials
 	}
-	user, err := s.store.FindSessionUser(ctx, HashSessionToken(token), s.now())
-	if err != nil || user.Status != "active" {
-		return User{}, ErrInvalidCredentials
+	session, err := s.store.FindSession(ctx, HashSessionToken(token), s.now())
+	if err != nil || session.User.Status != "active" {
+		return Session{}, ErrInvalidCredentials
 	}
-	return user, nil
+	return session, nil
+}
+
+func (s *Service) SessionHasRecentMFA(session Session) bool {
+	if session.AAL != "aal2" || session.MFAVerifiedAt == nil {
+		return false
+	}
+	verified := session.MFAVerifiedAt.UTC()
+	now := s.now()
+	return !verified.After(now) && now.Sub(verified) <= recentMFA
 }
 
 func (s *Service) Logout(ctx context.Context, token string) error {

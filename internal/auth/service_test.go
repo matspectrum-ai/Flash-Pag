@@ -27,12 +27,7 @@ type rateRow struct {
 }
 
 func newMemoryStore() *memoryStore {
-	return &memoryStore{
-		users:       map[string]User{},
-		credentials: map[string]Credential{},
-		sessions:    map[string]sessionRow{},
-		rates:       map[string]rateRow{},
-	}
+	return &memoryStore{users: map[string]User{}, credentials: map[string]Credential{}, sessions: map[string]sessionRow{}, rates: map[string]rateRow{}}
 }
 
 func (m *memoryStore) FindUserByUsername(_ context.Context, username string) (User, error) {
@@ -75,17 +70,17 @@ func (m *memoryStore) RevokeSession(_ context.Context, tokenHash string, revoked
 	return nil
 }
 
-func (m *memoryStore) FindSessionUser(_ context.Context, tokenHash string, now time.Time) (User, error) {
+func (m *memoryStore) FindSession(_ context.Context, tokenHash string, now time.Time) (Session, error) {
 	row, ok := m.sessions[tokenHash]
 	if !ok || row.revokedAt != nil || !now.Before(row.expiresAt) {
-		return User{}, errors.New("invalid session")
+		return Session{}, errors.New("invalid session")
 	}
 	for _, user := range m.users {
 		if user.ID == row.userID {
-			return user, nil
+			return Session{User: user, AAL: "aal1"}, nil
 		}
 	}
-	return User{}, errors.New("user not found")
+	return Session{}, errors.New("user not found")
 }
 
 func (m *memoryStore) AllowLogin(_ context.Context, keyHash, _, _ string, now time.Time) (bool, error) {
@@ -133,7 +128,6 @@ func TestNormalizeUsername(t *testing.T) {
 func TestServiceRegisterAndAuthenticate(t *testing.T) {
 	store := newMemoryStore()
 	service := NewService(store)
-
 	user, err := service.Register(context.Background(), "  Mateus  ", "correct horse battery staple")
 	if err != nil {
 		t.Fatalf("Register() error = %v", err)
@@ -144,7 +138,6 @@ func TestServiceRegisterAndAuthenticate(t *testing.T) {
 	if _, err := service.Register(context.Background(), "MATEUS", "another valid password"); !errors.Is(err, ErrUserExists) {
 		t.Fatalf("duplicate Register() error = %v", err)
 	}
-
 	fixedNow := time.Date(2026, 9, 10, 15, 0, 0, 0, time.UTC)
 	service.now = func() time.Time { return fixedNow }
 	authenticated, token, expiresAt, err := service.Authenticate(context.Background(), "MATEUS", "correct horse battery staple", "ip", "ua")
@@ -160,7 +153,6 @@ func TestServiceRegisterAndAuthenticate(t *testing.T) {
 	if _, _, _, err := service.Authenticate(context.Background(), "unknown", "wrong password", "ip", "ua"); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("unknown username error = %v", err)
 	}
-
 	sessionUser, err := service.AuthenticateSession(context.Background(), token)
 	if err != nil || sessionUser.ID != user.ID {
 		t.Fatalf("AuthenticateSession() = %+v, %v", sessionUser, err)

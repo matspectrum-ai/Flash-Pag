@@ -2,7 +2,6 @@ package httpapi
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -80,19 +79,6 @@ func (m *firstPartyMemoryStore) RevokeSession(_ context.Context, tokenHash strin
 	row.revokedAt = &revokedAt
 	m.sessions[tokenHash] = row
 	return nil
-}
-
-func (m *firstPartyMemoryStore) FindSessionUser(_ context.Context, tokenHash string, now time.Time) (auth.User, error) {
-	row, ok := m.sessions[tokenHash]
-	if !ok || row.revokedAt != nil || !now.Before(row.expiresAt) {
-		return auth.User{}, auth.ErrInvalidCredentials
-	}
-	for _, user := range m.users {
-		if user.ID == row.userID {
-			return user, nil
-		}
-	}
-	return auth.User{}, errors.New("user not found")
 }
 
 func (m *firstPartyMemoryStore) AllowLogin(_ context.Context, keyHash, _, _ string, now time.Time) (bool, error) {

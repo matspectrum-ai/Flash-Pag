@@ -22,6 +22,7 @@ type Server struct {
 	box       *cryptobox.Box
 	providers *provider.Registry
 	auth      *auth.Service
+	mfa       *auth.MFAService
 	log       *slog.Logger
 	mux       *http.ServeMux
 }
@@ -35,6 +36,13 @@ func New(cfg config.Config, sb *supabase.Client, box *cryptobox.Box, providers *
 	s.routes()
 	return s
 }
+
+func NewWithMFA(cfg config.Config, sb *supabase.Client, box *cryptobox.Box, providers *provider.Registry, log *slog.Logger, authService *auth.Service, mfaService *auth.MFAService) *Server {
+	s := &Server{cfg: cfg, sb: sb, box: box, providers: providers, auth: authService, mfa: mfaService, log: log, mux: http.NewServeMux()}
+	s.routes()
+	return s
+}
+
 func (s *Server) Handler() http.Handler {
 	return securityHeaders(previewReadOnly(s.cfg.PreviewReadOnly, s.mux))
 }
@@ -46,13 +54,14 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /docs", s.docs)
 	s.mux.HandleFunc("GET /openapi.yaml", s.openapi)
 
-	// First-party authentication is opt-in and intentionally uses a separate cookie and route
-	// namespace during migration. The existing /console/session Supabase flow remains intact.
-	s.mux.HandleFunc("POST /auth/login", s.firstPartyLogin)
-	s.mux.HandleFunc("POST /auth/logout", s.firstPartyLogout)
+	s.mux.HandleFunc("POST /auth/login", s.withFirstPartyOrigin(s.firstPartyLogin))
+	s.mux.HandleFunc("POST /auth/logout", s.withFirstPartyOrigin(s.firstPartyLogout))
 	s.mux.HandleFunc("GET /auth/me", s.firstPartyMe)
+	s.mux.HandleFunc("GET /auth/mfa/status", s.withFirstPartyAuth(s.firstPartyMFAStatus))
+	s.mux.HandleFunc("POST /auth/mfa/enroll", s.withFirstPartyOrigin(s.withFirstPartyAuth(s.firstPartyMFAEnroll)))
+	s.mux.HandleFunc("POST /auth/mfa/enroll/verify", s.withFirstPartyOrigin(s.withFirstPartyAuth(s.firstPartyMFAEnrollVerify)))
+	s.mux.HandleFunc("POST /auth/mfa/step-up", s.withFirstPartyOrigin(s.withFirstPartyAuth(s.firstPartyMFAStepUp)))
 
-	// Authentication and merchant onboarding.
 	s.mux.HandleFunc("POST /console/register", s.register)
 	s.mux.HandleFunc("POST /console/session", s.login)
 	s.mux.HandleFunc("DELETE /console/session", s.logout)
@@ -67,32 +76,22 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("POST /console/recovery/challenge", s.consoleRecoveryChallenge)
 	s.mux.HandleFunc("POST /console/recovery/reset-password", s.consoleRecoveryResetPassword)
 
-	// Private application API. The /console prefix is retained during the React migration
-	// as an implementation detail and is not exposed as product terminology in the UI.
 	s.mux.HandleFunc("GET /console/api/me", s.withConsoleAuth(s.consoleMe))
 	s.mux.HandleFunc("GET /console/api/access", s.withConsoleAuth(s.consoleAccess))
 	s.mux.HandleFunc("GET /console/api/summary", s.withConsoleAuth(s.consoleSummary))
-
-	// Merchant-level KYC/KYB. Documents are served through authenticated backend proxies;
-	// the private Storage bucket is never exposed directly to the browser.
 	s.mux.HandleFunc("GET /console/api/kyc", s.withConsoleAuth(s.consoleKYC))
 	s.mux.HandleFunc("PATCH /console/api/kyc", s.withConsoleAuth(s.consoleUpdateKYC))
 	s.mux.HandleFunc("POST /console/api/kyc/documents", s.withConsoleAuth(s.consoleUploadKYCDocument))
 	s.mux.HandleFunc("GET /console/api/kyc/documents/{id}", s.withConsoleAuth(s.consoleDownloadKYCDocument))
 	s.mux.HandleFunc("POST /console/api/kyc/submit", s.withConsoleAuth(s.consoleSubmitKYC))
-
-	// Sensitive tenant configuration gets exact routes so read permissions are enforced
-	// server-side instead of relying on navigation visibility in the React client.
 	s.mux.HandleFunc("GET /console/api/api-keys", s.withConsoleAuth(s.consoleSensitiveList("api-keys")))
 	s.mux.HandleFunc("GET /console/api/webhook-endpoints", s.withConsoleAuth(s.consoleSensitiveList("webhook-endpoints")))
 	s.mux.HandleFunc("GET /console/api/provider-connections", s.withConsoleAuth(s.consoleSensitiveList("provider-connections")))
 	s.mux.HandleFunc("GET /console/api/transactions", s.withConsoleAuth(s.consolePricedTransactions))
-
 	s.mux.HandleFunc("GET /console/api/members", s.withConsoleAuth(s.consoleMembers))
 	s.mux.HandleFunc("POST /console/api/members", s.withConsoleAuth(s.consoleCreateMember))
 	s.mux.HandleFunc("PATCH /console/api/members/{userID}", s.withConsoleAuth(s.consoleUpdateMember))
 	s.mux.HandleFunc("DELETE /console/api/members/{userID}", s.withConsoleAuth(s.consoleDeleteMember))
-
 	s.mux.HandleFunc("GET /console/api/{resource}", s.withConsoleAuth(s.consoleList))
 	s.mux.HandleFunc("POST /console/api/customers", s.withConsoleAuth(s.consoleCreateCustomer))
 	s.mux.HandleFunc("POST /console/api/api-keys", s.withRecentMFA(s.consoleCreateAPIKey))
@@ -108,7 +107,6 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("DELETE /console/api/withdrawal-destinations/{id}", s.withRecentMFA(s.withKYCApprovedConsole(s.consoleDeleteWithdrawalDestination)))
 	s.mux.HandleFunc("POST /console/api/withdrawals", s.withRecentMFA(s.withKYCApprovedConsole(s.consoleCreateWithdrawal)))
 
-	// Platform administration.
 	s.mux.HandleFunc("GET /console/api/admin/tenants", s.withAdmin(s.adminTenantInventory))
 	s.mux.HandleFunc("GET /console/api/admin/merchants/{merchantID}/members", s.withAdmin(s.adminMerchantMembers))
 	s.mux.HandleFunc("GET /console/api/admin/organizations/{organizationID}/stats", s.withAdmin(s.adminOrganizationStats))
@@ -137,7 +135,6 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /v1/webhooks", s.withAPIScope("webhooks:write", s.listWebhooks))
 	s.mux.HandleFunc("POST /v1/webhooks", s.withAPIScope("webhooks:write", s.createWebhook))
 	s.mux.HandleFunc("DELETE /v1/webhooks/{id}", s.withAPIScope("webhooks:write", s.deleteWebhook))
-
 	s.mux.HandleFunc("POST /providers/{provider}/webhooks/{connectionID}", s.providerWebhook)
 
 	legacy := http.FileServer(http.FS(ui.Files))
@@ -145,14 +142,12 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /console", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/console/", http.StatusTemporaryRedirect)
 	})
-
 	if appRoot, err := fs.Sub(ui.AppFiles, "dist"); err == nil {
 		s.mux.Handle("/app/", http.StripPrefix("/app", spaFileServer(appRoot)))
 		s.mux.HandleFunc("GET /app", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, "/app/", http.StatusTemporaryRedirect)
 		})
 	}
-
 	s.mux.HandleFunc("GET /{$}", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/app/", http.StatusTemporaryRedirect)
 	})
@@ -162,13 +157,11 @@ func previewReadOnly(enabled bool, next http.Handler) http.Handler {
 	if !enabled {
 		return next
 	}
-
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/console/session" && (r.Method == http.MethodPost || r.Method == http.MethodDelete) {
 			next.ServeHTTP(w, r)
 			return
 		}
-
 		switch r.Method {
 		case http.MethodGet, http.MethodHead, http.MethodOptions:
 			next.ServeHTTP(w, r)

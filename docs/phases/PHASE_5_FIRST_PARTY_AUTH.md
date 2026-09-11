@@ -33,24 +33,45 @@ No runtime authentication behavior is switched by Stage 1.
 
 ### Stage 2 — Go authentication
 
-Implement:
+Implemented foundation:
 - username normalization and uniqueness;
 - password hashing using Argon2id;
 - opaque server-side sessions with hashed bearer tokens;
 - session revocation and expiry;
-- login, registration and logout contracts in Go;
+- first-party HTTP login, session introspection and logout contracts;
 - uniform authentication failure responses to reduce account enumeration;
-- append-only security evidence.
+- PostgreSQL-backed username+IP login throttling;
+- explicit Secure cookie configuration for reverse-proxy deployments;
+- append-only security evidence schema.
+
+The first-party HTTP path remains opt-in and is not the production authentication path yet.
 
 ### Stage 3 — MFA and recovery migration
 
-Implement first-party TOTP enrollment/challenge/verification using encrypted secrets in `app_totp_factors`.
+Implemented MFA foundation:
+- migration `0019_first_party_mfa_assurance.sql` adds explicit session assurance (`aal1`/`aal2`) and TOTP factor parameters/replay state;
+- migration `0020_first_party_mfa_atomicity.sql` and `0021_first_party_mfa_atomic_step.sql` establish PostgreSQL state-transition functions;
+- Go TOTP primitives generate 160-bit secrets, build `otpauth://` provisioning URIs, and verify RFC 6238-compatible SHA-1 codes with a bounded ±1 timestep window;
+- TOTP secrets are encrypted at rest through the existing AES-GCM cryptobox and are never returned from persistence APIs;
+- first-party HTTP endpoints now expose MFA status, enrollment, enrollment verification and step-up;
+- step-up consumes the accepted timestep and elevates the same AAL1 session to AAL2 inside a PostgreSQL atomic operation;
+- session introspection carries MFA verification state and recent-MFA freshness is enforced by the first-party AAL2 middleware helper;
+- disposable PostgreSQL CI infrastructure is configured and a concurrency test executes the production migration functions against a real PostgreSQL instance;
+- first-party authentication mutations enforce same-origin requests when browsers supply the `Origin` header, with `SameSite=Lax` retained on the session cookie;
+- migration `0022_first_party_membership_links.sql` adds first-party identity bridges for merchant memberships and platform-admin relationships, backfills them from the existing compatibility mapping, and exposes service-role-only first-party authorization read functions.
+
+Not yet complete:
+- first-party recovery migration;
+- completion of membership/platform-admin runtime authorization cutover from legacy `auth.users` identifiers;
+- integration of first-party AAL2/recent-MFA authorization into the eventual financial/configuration cutover;
+- end-to-end account migration/re-enrollment flow for existing users;
+- final production cutover validation.
 
 Existing Supabase TOTP secrets must not be extracted. Existing users must enter an explicit re-enrollment path after the cutover. Recovery must be first-party and retain the existing Recovery Kit security model.
 
 ### Stage 4 — Domain/user FK migration
 
-Move membership and platform-admin relationships from `auth.users` to `app_users` while preserving UUID identity values. Update affected SQL functions and Go data access accordingly. Remove runtime reads from `auth.users`.
+Continue the bridge established by migration `0022_first_party_membership_links.sql`: migrate membership and platform-admin runtime reads and writes from `auth.users` identifiers to `app_users` while preserving UUID identity values. Update affected SQL functions and Go data access accordingly. Remove runtime reads from `auth.users` only after dual-path validation is complete.
 
 ### Stage 5 — Cutover and cleanup
 

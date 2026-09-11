@@ -41,6 +41,8 @@ func main() {
 
 	var authService *auth.Service
 	var authStore *auth.PostgresStore
+	var mfaStore *auth.PostgresMFAStore
+	var mfaService *auth.MFAService
 	if cfg.FirstPartyAuthEnabled {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		pool, openErr := db.Open(ctx, cfg.DatabaseURL)
@@ -50,17 +52,24 @@ func main() {
 			os.Exit(1)
 		}
 		authStore = auth.NewPostgresStore(pool)
+		mfaStore = auth.NewPostgresMFAStore(pool)
 		if err := pool.Ping(context.Background()); err != nil {
 			authStore.Close()
 			log.Error("first-party auth database ping failed", "err", err)
 			os.Exit(1)
 		}
 		authService = auth.NewService(authStore)
+		mfaService = auth.NewMFAService(mfaStore, box)
 		log.Info("first-party auth storage enabled")
 	}
 
 	providers := provider.NewRegistry(providermock.New(), providerpixhub.New())
-	app := httpapi.New(cfg, sb, box, providers, log, authService)
+	var app *httpapi.Server
+	if cfg.FirstPartyAuthEnabled {
+		app = httpapi.NewWithMFA(cfg, sb, box, providers, log, authService, mfaService)
+	} else {
+		app = httpapi.New(cfg, sb, box, providers, log, authService)
+	}
 	srv := &http.Server{Addr: cfg.Addr, Handler: app.Handler(), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 20 * time.Second, IdleTimeout: 60 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

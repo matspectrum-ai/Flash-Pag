@@ -54,6 +54,9 @@ func Load() (Config, error) {
 		}
 		cfg.MasterKey = raw
 	}
+	if cfg.FirstPartyAuthEnabled && len(cfg.MasterKey) != 32 {
+		return Config{}, errors.New("APP_MASTER_KEY_B64 is required and must encode exactly 32 bytes when APP_FIRST_PARTY_AUTH_ENABLED is true")
+	}
 	return cfg, nil
 }
 

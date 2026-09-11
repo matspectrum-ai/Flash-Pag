@@ -1,0 +1,86 @@
+-- First-party MFA state transitions that must be atomic.
+-- Each function executes as one PostgreSQL transaction: either all state changes happen,
+-- or none do.
+
+create or replace function public.flashpag_confirm_totp_enrollment(
+  p_user_id uuid,
+  p_step bigint,
+  p_verified_at timestamptz
+) returns boolean
+language plpgsql
+security invoker
+set search_path = public
+as $$
+begin
+  update public.app_totp_factors
+     set enabled_at = p_verified_at,
+         disabled_at = null,
+         last_used_step = p_step,
+         last_used_at = p_verified_at,
+         updated_at = p_verified_at
+   where user_id = p_user_id
+     and enabled_at is null
+     and disabled_at is null
+     and (last_used_step is null or last_used_step < p_step);
+
+  return found;
+end;
+$$;
+
+revoke all on function public.flashpag_confirm_totp_enrollment(uuid, bigint, timestamptz) from public, anon, authenticated;
+grant execute on function public.flashpag_confirm_totp_enrollment(uuid, bigint, timestamptz) to service_role;
+
+create or replace function public.flashpag_consume_totp_and_elevate_session(
+  p_user_id uuid,
+  p_session_token_hash text,
+  p_step bigint,
+  p_verified_at timestamptz
+) returns boolean
+language plpgsql
+security invoker
+set search_path = public
+as $$
+begin
+  -- Lock the session first. This both validates ownership and prevents a concurrent
+  -- revoke from invalidating the session after validation but before elevation.
+  perform 1
+    from public.app_sessions
+   where token_hash = p_session_token_hash
+     and user_id = p_user_id
+     and revoked_at is null
+     and expires_at > p_verified_at
+     and aal = 'aal1'
+   for update;
+
+  if not found then
+    raise exception using
+      errcode = 'P0001',
+      message = 'mfa_session_elevation_failed';
+  end if;
+
+  update public.app_totp_factors
+     set last_used_step = p_step,
+         last_used_at = p_verified_at,
+         updated_at = p_verified_at
+   where user_id = p_user_id
+     and enabled_at is not null
+     and disabled_at is null
+     and (last_used_step is null or last_used_step < p_step);
+
+  if not found then
+    return false;
+  end if;
+
+  update public.app_sessions
+     set aal = 'aal2',
+         mfa_verified_at = p_verified_at,
+         last_seen_at = p_verified_at
+   where token_hash = p_session_token_hash
+     and user_id = p_user_id;
+
+  return true;
+end;
+$$;
+
+revoke all on function public.flashpag_consume_totp_and_elevate_session(uuid, text, bigint, timestamptz) from public, anon, authenticated;
+grant execute on function public.flashpag_consume_totp_and_elevate_session(uuid, text, bigint, timestamptz) to service_role;
